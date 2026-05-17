@@ -5,8 +5,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 
 WORKDIR /app
 
+# Copying config.yaml here means its version field busts the Docker layer
+# cache on every addon version bump, forcing a fresh git clone + bun install.
+COPY config.yaml /tmp/addon-config.yaml
+
 # Clone source and install dependencies at build time.
-# Re-install the addon in HA to pick up new releases.
 RUN git clone https://github.com/madslundt/aula-mcp-ha.git . \
     && bun install
 
