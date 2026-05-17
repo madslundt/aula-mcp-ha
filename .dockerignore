@@ -1,0 +1,8 @@
+node_modules
+.git
+.omc
+docs/demos
+*.md
+!README.md
+dist
+.env

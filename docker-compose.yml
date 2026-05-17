@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  aula-mcp:
+    build: .
+    container_name: aula-mcp
+    environment:
+      # Tokens and config are persisted in the mounted volume below.
+      # Set AULA_MCP_KEY to a long passphrase to encrypt the token store.
+      # - AULA_MCP_KEY=your-secret-passphrase
+    ports:
+      - "7878:7878"
+    volumes:
+      # HA OS / Portainer path — change to a local path if running elsewhere:
+      #   - ./config:/config
+      - /mnt/data/supervisor/share/aula-mcp:/config
+    restart: unless-stopped

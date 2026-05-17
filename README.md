@@ -247,90 +247,65 @@ aula.yourhome.dk {
 
 ### Option 3: Docker Compose (Portainer / Home Assistant)
 
-The easiest way to run `aula-mcp` in Portainer or any Docker environment. The server persists tokens in a mounted volume so they survive container restarts.
+The repo ships a `Dockerfile` and `docker-compose.yml` so you can build and run with a single command. No runtime cloning, no installing Bun on top of Node — the image is self-contained and starts in seconds.
 
-**Recommended: using the official Bun image**
+**1. Clone the repo and build**
+
+```sh
+git clone https://github.com/madslundt/aula-mcp-ha.git
+cd aula-mcp-ha
+docker compose up -d --build
+```
+
+In Portainer: add a new stack, paste the contents of `docker-compose.yml`, and click Deploy. The image is built from the `Dockerfile` in the repo root.
+
+**`docker-compose.yml`** (already in the repo, adjust the volume path if needed):
 
 ```yaml
 version: "3.9"
 services:
   aula-mcp:
-    image: oven/bun:1-debian
+    build: .
     container_name: aula-mcp
-    working_dir: /app
     environment:
-      - AULA_MCP_PORT=7878
-      - AULA_MCP_HOST=0.0.0.0
-      - AULA_MCP_ALLOW_REMOTE=1
-      - AULA_MCP_NO_KEYCHAIN=1
-      - AULA_MCP_DIR=/config
-    command: >
-      sh -c "apt-get update -qq && apt-get install -y -qq git &&
-             [ -d /app/.git ] || git clone https://github.com/madslundt/aula-mcp-ha.git /app &&
-             bun install &&
-             bun packages/mcp-server/src/server.ts"
+      # Set AULA_MCP_KEY to a passphrase to encrypt the token store:
+      # - AULA_MCP_KEY=your-secret-passphrase
     ports:
       - "7878:7878"
     volumes:
+      # HA OS / Portainer path — change to ./config:/config for a local setup
       - /mnt/data/supervisor/share/aula-mcp:/config
     restart: unless-stopped
 ```
 
-> **Why `oven/bun:1-debian` instead of `node:22`?** The Bun image is ~3x smaller, starts faster, and runs TypeScript directly — no build step needed. The `node:22` approach requires installing Bun on top anyway.
+All other environment variables (`AULA_MCP_HOST`, `AULA_MCP_ALLOW_REMOTE`, `AULA_MCP_NO_KEYCHAIN`, etc.) are set to sensible defaults in the `Dockerfile` and do not need to be repeated here.
 
-**Alternative: using `node:22` (your current setup, corrected URL)**
+**2. First-time MitID login**
 
-```yaml
-version: "3.9"
-services:
-  aula-mcp:
-    image: node:22-bookworm-slim
-    container_name: aula-mcp
-    working_dir: /app
-    environment:
-      - DEBIAN_FRONTEND=noninteractive
-      - AULA_MCP_PORT=7878
-      - AULA_MCP_HOST=0.0.0.0
-      - AULA_MCP_ALLOW_REMOTE=1
-      - AULA_MCP_NO_KEYCHAIN=1
-      - AULA_MCP_DIR=/config
-      - PATH=/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    command: >
-      sh -c "apt-get update && apt-get install -y git curl unzip &&
-             curl -fsSL https://bun.sh/install | bash &&
-             npm install -g pnpm &&
-             [ -d /app/src/.git ] || git clone https://github.com/madslundt/aula-mcp-ha.git /app/src &&
-             cd /app/src && pnpm install &&
-             bun packages/mcp-server/src/server.ts"
-    ports:
-      - "7878:7878"
-    volumes:
-      - /mnt/data/supervisor/share/aula-mcp:/config
-    restart: unless-stopped
-```
-
-**First-time login (required before the server can talk to Aula):**
-
-After the container is running, exec into it and run the MitID login flow. The QR code appears in the terminal — scan it with the MitID app on your phone:
+After the container is running, exec into it and complete the login flow. The QR code appears in the terminal — scan it with the MitID app on your phone:
 
 ```sh
-# Portainer: use the "Exec" button on the container, or via CLI:
-docker exec -it aula-mcp sh -c "cd /app && bun apps/cli/src/index.ts login"
-# or if using the node:22 image with cloned repo:
-docker exec -it aula-mcp sh -c "cd /app/src && bun apps/cli/src/index.ts login"
+# CLI / Portainer "Exec console":
+docker exec -it aula-mcp bun apps/cli/src/index.ts login
 ```
 
-Tokens are written to the mounted volume (`/config`) and persist across restarts.
+Tokens are written to the mounted volume (`/config`) and survive container restarts and image rebuilds.
 
-**Verify everything is working:**
+**3. Verify**
 
 ```sh
-# Health check
 curl http://localhost:7878/healthz
 # → {"ok":true,"name":"aula-mcp"}
 
-# Test all Aula endpoints
-docker exec -it aula-mcp sh -c "cd /app && bun apps/cli/src/index.ts doctor"
+docker exec -it aula-mcp bun apps/cli/src/index.ts doctor
+```
+
+**Updating to a newer version**
+
+```sh
+cd aula-mcp-ha
+git pull
+docker compose up -d --build
 ```
 
 ### Option 4: Home Assistant Add-on (coming soon)
