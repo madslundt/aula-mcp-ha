@@ -157,7 +157,10 @@ export async function buildDiscoverManifest(context: AulaContext): Promise<Disco
       cache:
         'Reuse this manifest for the rest of the session. Do not call aula.discover again unless a tool reports unknown children/widgets.',
       nameResolution:
-        'Match kid names from the user prompt against children[].name (case-insensitive, partial). E.g. "luk" matches "Lukas". Use the matched child.id for childIds and child.userId for profileIds.',
+        'Match kid names from the user prompt against children[].name (case-insensitive, partial). E.g. "luk" matches "Lukas". ' +
+        'Use children[].id for childIds (presence.today). ' +
+        'Use children[].institution.id for profileIds (calendar.events — these are institution profile IDs). ' +
+        'Use children[].userId for sessionId/sessionUUID (third-party widgets: ugeplan, opgaver, ugebrev, huskelisten, lektier).',
       pickOne:
         'For ugeplan/ugebrev/opgaver/huskelisten, call only capabilities[area].tools[0] — that is the provider this user actually has. Skip alternates unless the first errors.',
       timeWindows:

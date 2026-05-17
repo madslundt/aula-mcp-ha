@@ -165,7 +165,21 @@ export class AulaContext {
       logger: this.logger,
     });
     this.cachedRecord = record;
-    return new AulaClient({ tokens: record.tokens, http: this.http, logger: this.logger });
+    const client = new AulaClient({ tokens: record.tokens, http: this.http, logger: this.logger });
+    // Establish the guardian session context so messaging/calendar endpoints
+    // work on the first tool call. Aula's messaging API returns 403 when
+    // getProfileContext has not been called yet in the current HTTP session.
+    try {
+      const ctx = await client.getProfileContext('guardian');
+      if (this.cachedGuardianUserId === undefined && ctx.userId != null && ctx.userId !== '') {
+        this.cachedGuardianUserId = String(ctx.userId);
+      }
+    } catch (err) {
+      this.logger.warn('aula-context.session_warmup_failed', {
+        error: (err as Error).message,
+      });
+    }
+    return client;
   }
 }
 

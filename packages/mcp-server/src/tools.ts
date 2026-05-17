@@ -80,6 +80,7 @@ export function registerTools(server: McpServer, context: AulaContext): void {
       title: 'Calendar events (school schedule)',
       description:
         'Lessons + events for the given institution-profile IDs. ' +
+        'Get profileIds from aula.discover → children[].institution.id (NOT children[].id or children[].userId). ' +
         'Pass `range` for a preset window (today/tomorrow/this_week/next_week) ' +
         'OR `start`+`end` for a specific window. Timestamps are formatted as Aula ' +
         'expects: "YYYY-MM-DD HH:MM:SS.0000+ZZZZ". Aula uses Europe/Copenhagen.',
