@@ -34,6 +34,8 @@ export interface LoginCommandArgs {
   debug?: boolean;
   /** Override the file path the wire transcript is written to. */
   transcript?: string;
+  /** 1-based identity index — skips the interactive prompt when set. */
+  identityIndex?: number;
 }
 
 export async function runLogin(args: LoginCommandArgs): Promise<void> {
@@ -83,6 +85,17 @@ export async function runLogin(args: LoginCommandArgs): Promise<void> {
       ...(codeTokenPassword ? { password: codeTokenPassword } : {}),
       ...(promptForCodeToken ? { promptForCodeToken } : {}),
       selectIdentity: async (options: IdentityOption[]) => {
+        if (args.identityIndex !== undefined) {
+          const n = args.identityIndex;
+          const clamped = n >= 1 && n <= options.length ? n : 1;
+          if (clamped !== n) {
+            warn(`--identity ${n} is out of range (1-${options.length}), using 1`);
+          }
+          identityIndex = clamped;
+          identityName = options.find((o) => o.index === clamped)?.name;
+          info(`Auto-selecting identity ${clamped}: ${identityName ?? '?'}`);
+          return clamped;
+        }
         const choice = await selectFromList(
           'Pick the identity to log in as:',
           options.map((o) => ({ label: o.name })),

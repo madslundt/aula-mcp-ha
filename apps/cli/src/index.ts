@@ -29,8 +29,8 @@ import { parseArgs } from './parse-args.ts';
 const HELP = `${fmt.bold('aula')} — MCP-friendly Aula client
 
 ${fmt.bold('Usage')}:
-  aula login [--username <user>] [--method APP|CODE_TOKEN] [--debug]
-             [--transcript <file>]
+  aula login [--username <user>] [--method APP|CODE_TOKEN] [--identity N]
+             [--debug] [--transcript <file>]
   aula status [--json]
   aula whoami [--json]
   aula doctor [--json] [--verbose]
@@ -74,11 +74,17 @@ async function main(): Promise<void> {
       const debug = args.flags.debug === true;
       const transcript =
         typeof args.flags.transcript === 'string' ? args.flags.transcript : undefined;
+      const identityRaw = args.flags.identity;
+      const identityIndex =
+        typeof identityRaw === 'string' ? Number.parseInt(identityRaw, 10) : undefined;
       await runLogin({
         ...(username ? { username } : {}),
         ...(method ? { method } : {}),
         ...(debug ? { debug: true } : {}),
         ...(transcript ? { transcript } : {}),
+        ...(typeof identityIndex === 'number' && Number.isFinite(identityIndex)
+          ? { identityIndex }
+          : {}),
       });
       break;
     }
