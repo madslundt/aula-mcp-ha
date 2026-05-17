@@ -80,9 +80,11 @@ const sseSessions = new Map<string, SseSession>();
 app.get('/sse', (c) =>
   streamSSE(c, async (stream) => {
     const sessionId = crypto.randomUUID();
+    const host = c.req.header('host') ?? `localhost:${PORT}`;
+    const proto = c.req.header('x-forwarded-proto') ?? 'http';
     const sseTransport = new HonoSseTransport({
       sessionId,
-      messageEndpoint: '/messages',
+      messageEndpoint: `${proto}://${host}/messages`,
       stream,
     });
     // McpServer.connect() binds a single transport, so we instantiate a
