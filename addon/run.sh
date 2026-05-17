@@ -14,19 +14,20 @@ AULA_MCP_KEY_VAL=$(jq -r '.aula_mcp_key // empty' "$OPTS" 2>/dev/null || true)
 
 MITID_USERNAME=$(jq -r '.mitid_username // empty' "$OPTS" 2>/dev/null || true)
 
+if [ -z "$MITID_USERNAME" ]; then
+  echo "--- Aula MCP: 'mitid_username' is not set ---"
+  echo "--- Go to Settings → Add-ons → Aula MCP → Configuration, set your MitID username, and restart the addon ---"
+  exit 1
+fi
+
 echo "--- Aula MCP: startup health check ---"
 if bun /app/apps/cli/src/index.ts doctor; then
   echo "--- Health check passed ---"
 else
-  echo "--- Health check failed ---"
-  if [ -n "$MITID_USERNAME" ]; then
-    echo "--- Logging in as '$MITID_USERNAME' ---"
-    echo "--- Open Settings → Add-ons → Aula MCP → Log tab and scan the QR code with the MitID app ---"
-    bun /app/apps/cli/src/index.ts login --username "$MITID_USERNAME" || \
-      echo "--- Login failed — server will start but Aula tools will not work until you log in ---"
-  else
-    echo "--- Set 'mitid_username' in the Configuration tab and restart the addon to enable auto-login ---"
-  fi
+  echo "--- Health check failed — logging in as '$MITID_USERNAME' ---"
+  echo "--- Open Settings → Add-ons → Aula MCP → Log tab and scan the QR code with the MitID app ---"
+  bun /app/apps/cli/src/index.ts login --username "$MITID_USERNAME" || \
+    echo "--- Login failed — server will start but Aula tools will not work until you log in ---"
 fi
 
 echo "--- Starting MCP server on :$AULA_MCP_PORT ---"
