@@ -66,6 +66,17 @@ app.post('/mcp', (c) => handleMcp(c.req.raw));
 app.get('/mcp', (c) => handleMcp(c.req.raw));
 app.delete('/mcp', (c) => handleMcp(c.req.raw));
 
+// HA's Python `mcp` client (mcp==1.x) first attempts Streamable HTTP by
+// POSTing to the user-supplied URL, then falls back to the legacy SSE
+// transport only when the server returns HTTP 405. Hono's default for an
+// unmatched method is 404, which the Python client treats as a hard failure.
+// Explicitly return 405 + Allow header so HA recognises this as "SSE-only"
+// and retries with its SSE transport.
+app.post('/sse', (c) => c.newResponse(null, 405, { Allow: 'GET' }));
+app.delete('/sse', (c) => c.newResponse(null, 405, { Allow: 'GET' }));
+app.put('/sse', (c) => c.newResponse(null, 405, { Allow: 'GET' }));
+app.patch('/sse', (c) => c.newResponse(null, 405, { Allow: 'GET' }));
+
 // Legacy MCP SSE transport — for clients that haven't moved to Streamable HTTP
 // yet, notably Home Assistant's official `mcp` (client) integration. Each
 // GET /sse opens a fresh session: own McpServer instance, own AulaContext,
