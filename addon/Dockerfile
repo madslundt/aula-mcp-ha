@@ -1,6 +1,6 @@
 FROM oven/bun:1-debian
 
-RUN apt-get update && apt-get install -y --no-install-recommends git jq \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git jq \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
