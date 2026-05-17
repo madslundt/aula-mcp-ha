@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"pnpm lint 2>&1\",\"description\":\"Run linter\",\"run_in_background\":false}",
-  "error": "Exit code 1\n\n> aula-mcp@1.0.1 lint /Users/madslundt/Documents/aula-mcp\n> biome check .\n\nbiome.json:2:14 deserialize ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n  i The configuration schema version does not match the CLI version 2.4.15\n  \n    1 │ {\n  > 2 │   \"$schema\": \"https://biomejs.dev/schemas/2.4.14/schema.json\",\n      │              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    3 │   \"vcs\": { \"enabled\": true, \"clientKind\": \"git\", \"useIgnoreFile\": true },...",
-  "timestamp": "2026-05-17T16:22:13.665Z",
-  "retry_count": 1
-}

@@ -29,6 +29,7 @@ tokens.json
 # claude's working notes
 .aula-mcp-plan.md
 .claude-scratch/
+.omc/
 
 # editor + os
 .DS_Store
