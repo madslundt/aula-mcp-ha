@@ -16,8 +16,10 @@ ports:
 ports_description:
   7878/tcp: "MCP server (Streamable HTTP /mcp + legacy SSE /sse)"
 options:
+  mitid_username: ""
   aula_mcp_key: ""
 schema:
+  mitid_username: "str?"
   aula_mcp_key: "str?"
 map:
   - data:rw
