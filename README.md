@@ -308,13 +308,40 @@ git pull
 docker compose up -d --build
 ```
 
-### Option 4: Home Assistant Add-on (coming soon)
+### Option 4: Home Assistant Add-on (recommended for HA users)
 
-The cleanest option for HA users. An add-on will package `aula-mcp` so it runs as part of your HA installation and is available to HA's Voice/Assist and all your automations. With **Nabu Casa** this also enables secure remote access via their tunnel.
+The cleanest option if you run Home Assistant OS or Supervised. The add-on shows up in **Settings → Add-ons**, is managed by the HA Supervisor (watchdog, auto-restart), and has a config UI — no Portainer needed.
 
-> 🛣️ Tracked as a planned feature — feedback from HA users very welcome. If you have experience with HA add-on development, your help is appreciated.
+**Install in 3 steps:**
 
-Until the add-on is ready, use the Docker Compose option above (Option 3).
+1. **Add this repository to HA:**
+   - Go to **Settings → Add-ons → Add-on Store**
+   - Click the three-dot menu (⋮) → **Repositories**
+   - Add `https://github.com/madslundt/aula-mcp-ha` and click **Add**
+
+2. **Install the add-on:**
+   - Refresh the page — "Aula MCP" appears in the store
+   - Click it → **Install** (HA builds the image from the Dockerfile; takes ~2 min on first install)
+   - Optionally set `aula_mcp_key` in the **Configuration** tab to encrypt the token store
+   - Click **Start**
+
+3. **First-time MitID login:**
+   - Open the HA **Terminal & SSH** add-on (or use the web terminal)
+   - Run:
+     ```sh
+     docker exec -it $(docker ps --filter name=aula_mcp -q) \
+       bun /app/apps/cli/src/index.ts login
+     ```
+   - Scan the QR code with the MitID app — tokens are saved to the add-on's `/data` volume
+
+**Connect HA's MCP integration:**
+- Go to **Settings → Integrations → Add → Model Context Protocol**
+- SSE URL: `http://homeassistant.local:7878/sse`
+
+**Updating:** Go to the add-on page → **Update** button. HA rebuilds the image from the latest source.
+
+> **Compared to Portainer Docker Compose:**
+> The add-on is managed entirely within HA — no separate tool needed, config lives in the HA UI, and the Supervisor handles restarts and watchdog monitoring automatically.
 
 ### Option 5: VPS in Europe (Hetzner, Coolify)
 
