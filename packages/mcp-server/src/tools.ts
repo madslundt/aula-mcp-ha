@@ -254,12 +254,17 @@ export function registerTools(server: McpServer, context: AulaContext): void {
     };
   }
 
+  const integrationArgHint =
+    'Pass childIds from aula.discover → children[].id, ' +
+    'institutionCodes from children[].institution.code, ' +
+    'and isoWeek as "YYYY-Www" for the target week (omit for current week). ' +
+    'Returns the full week — filter by date in your response.';
+
   server.registerTool(
     'aula.ugeplan.easyiq',
     {
       title: 'EasyIQ weekly plan',
-      description:
-        'Weekly plan from EasyIQ for the given children. Use when the school is on EasyIQ.',
+      description: `Weekly plan from EasyIQ for the given children. Use when the school is on EasyIQ. ${integrationArgHint}`,
       inputSchema: integrationContextShape,
     },
     async (args) => {
@@ -272,8 +277,7 @@ export function registerTools(server: McpServer, context: AulaContext): void {
     'aula.ugeplan.meebook',
     {
       title: 'Meebook weekly plan',
-      description:
-        'Weekly plan from Meebook for the given children. Use when the school is on Meebook.',
+      description: `Weekly plan from Meebook for the given children. Use when the school is on Meebook. ${integrationArgHint}`,
       inputSchema: integrationContextShape,
     },
     async (args) => {
@@ -288,7 +292,8 @@ export function registerTools(server: McpServer, context: AulaContext): void {
       title: 'EasyIQ SkolePortal weekly plan',
       description:
         'Weekly plan from EasyIQ SkolePortal (widget 0128) — a different EasyIQ product than ' +
-        '`aula.ugeplan.easyiq` (widget 0001). Use when discover.detectedWidgets contains "0128".',
+        '`aula.ugeplan.easyiq` (widget 0001). Use when discover.detectedWidgets contains "0128". ' +
+        integrationArgHint,
       inputSchema: integrationContextShape,
     },
     async (args) => {

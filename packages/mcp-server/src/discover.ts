@@ -158,13 +158,17 @@ export async function buildDiscoverManifest(context: AulaContext): Promise<Disco
         'Reuse this manifest for the rest of the session. Do not call aula.discover again unless a tool reports unknown children/widgets.',
       nameResolution:
         'Match kid names from the user prompt against children[].name (case-insensitive, partial). E.g. "luk" matches "Lukas". ' +
-        'Use children[].id for childIds (presence.today). ' +
-        'Use children[].institution.id for profileIds (calendar.events — these are institution profile IDs). ' +
-        'Use children[].userId for sessionId/sessionUUID (third-party widgets: ugeplan, opgaver, ugebrev, huskelisten, lektier).',
+        'Use children[].id for childIds (presence.today, ugeplan, opgaver, ugebrev, huskelisten, lektier). ' +
+        'Use children[].institution.id for profileIds (calendar.events — institution profile IDs, NOT child.id). ' +
+        'Use children[].institution.code for institutionCodes (ugeplan, opgaver, ugebrev, huskelisten, lektier). ' +
+        'Use children[].userId only as sessionId/sessionUUID when a third-party integration explicitly asks for it.',
       pickOne:
         'For ugeplan/ugebrev/opgaver/huskelisten, call only capabilities[area].tools[0] — that is the provider this user actually has. Skip alternates unless the first errors.',
       timeWindows:
-        'For calendar/ugeplan: "denne uge"→range:"this_week", "næste uge"→"next_week", "i dag"→"today", "i morgen"→"tomorrow". Times are Europe/Copenhagen.',
+        'For calendar.events use range: "today"/"tomorrow"/"this_week"/"next_week" OR explicit start/end. ' +
+        'For ugeplan/opgaver/ugebrev pass isoWeek (format "YYYY-Www", e.g. "2026-W21"). ' +
+        'Compute isoWeek from the target date — ISO weeks run Monday–Sunday. If "i morgen" falls in a different week than today, use that week\'s isoWeek. Omit isoWeek to default to the current week. ' +
+        'Times are Europe/Copenhagen.',
       language:
         'Reply in the user\'s language. Format dates as "mandag 12. maj" for Danish output.',
     },
