@@ -178,55 +178,40 @@ export function registerTools(server: McpServer, context: AulaContext): void {
         ...(args.limit !== undefined ? { limit: args.limit } : {}),
         ...(args.index !== undefined ? { index: args.index } : {}),
       });
-      // Aula v23's posts.getAllPosts intermittently returns an empty `posts`
-      // array even when hasMorePosts=true — appears to depend on the
-      // profileLastSeenPostDate cursor advancing on each call. As a
-      // pragmatic fallback for digest use cases, when posts is empty we
-      // synthesize entries from notifications.list (notificationArea:
-      // "Posts") so the LLM has something to work with. Each entry includes
-      // a `_source: "notifications"` marker so callers can distinguish.
+
+      // Aula's posts.getAllPosts in v23 returns posts:[] once the guardian
+      // has viewed posts in the app (profileLastSeenPostDate advances).
+      // notifications.list only contains *unread* badges. To keep the
+      // digest useful, we observe posts via notifications.list while they
+      // are still visible and persist them in a local cache that survives
+      // read-state changes.
+      const postsCache = await context.getPostsCache();
+      try {
+        const notifs = await client.getNotifications();
+        const touched = postsCache.observeNotifications(notifs);
+        if (touched > 0) await postsCache.save();
+      } catch {
+        // Notifications fetch failures must not block posts.list — the
+        // cache lookup below still works on whatever was previously saved.
+      }
+
       const looksEmpty =
-        typeof raw === 'object' && raw !== null && Array.isArray((raw as { posts?: unknown }).posts) &&
+        typeof raw === 'object' &&
+        raw !== null &&
+        Array.isArray((raw as { posts?: unknown }).posts) &&
         ((raw as { posts: unknown[] }).posts).length === 0;
       if (!looksEmpty) return jsonContent(raw);
-      const notifs = await client.getNotifications();
-      const cutoffDays = 14; // Wider than 7d so the LLM can pick its own window.
-      const cutoff = Date.now() - cutoffDays * 24 * 60 * 60 * 1000;
+
       const limit = args.limit ?? 20;
-      const synthesized: Array<{
-        postId: number;
-        title: string;
-        triggered: string;
-        institutionProfileId?: number;
-        institutionCode?: string;
-        _source: 'notifications';
-      }> = [];
-      if (Array.isArray(notifs)) {
-        for (const n of notifs as Array<Record<string, unknown>>) {
-          if (n.notificationArea !== 'Posts') continue;
-          const triggered = typeof n.triggered === 'string' ? n.triggered : undefined;
-          if (!triggered) continue;
-          if (Date.parse(triggered) < cutoff) continue;
-          const entry: (typeof synthesized)[number] = {
-            postId: typeof n.postId === 'number' ? n.postId : 0,
-            title: typeof n.postTitle === 'string' ? n.postTitle : '(no title)',
-            triggered,
-            _source: 'notifications',
-          };
-          if (typeof n.institutionProfileId === 'number') entry.institutionProfileId = n.institutionProfileId;
-          if (typeof n.institutionCode === 'string') entry.institutionCode = n.institutionCode;
-          synthesized.push(entry);
-        }
-      }
-      synthesized.sort((a, b) => Date.parse(b.triggered) - Date.parse(a.triggered));
+      const cached = postsCache.list(14).slice(0, limit);
       return jsonContent({
-        posts: synthesized.slice(0, limit),
-        _fallback: 'notifications',
+        posts: cached.map((p) => ({ ...p, _source: 'cache' })),
+        _fallback: 'posts-cache',
+        _cacheSize: postsCache.size,
         _note:
-          "Aula's v23 posts.getAllPosts returned posts:[] despite hasMorePosts=true; " +
-          "this is a known v23 quirk. Falling back to notifications.list (notificationArea='Posts') " +
-          'which only contains the post metadata (title, postId, institutionProfileId, triggered) — ' +
-          'no full body. Sufficient for digest summaries.',
+          "Aula's posts.getAllPosts returned posts:[] (read-state advanced past all posts). " +
+          'Serving from the persistent post-metadata cache (populated from notifications.list ' +
+          'while badges were active). Cache window: 14 days, retention: 30 days.',
       });
     },
   );

@@ -30,6 +30,7 @@ import {
   SystematicClient,
   WidgetTokenManager,
 } from '@aula-mcp/aula-client';
+import { PostsCache } from './posts-cache.ts';
 
 export interface AulaContextOptions {
   store?: TokenStore;
@@ -57,6 +58,10 @@ export class AulaContext {
    *  Required as the `institutionProfileIds[]` scope on posts.getAllPosts;
    *  distinct from children[].institutionProfile.id. */
   private cachedInstitutionProfileIds: readonly number[] | undefined;
+  /** Persistent cache of post metadata observed via notifications.list.
+   *  posts.getAllPosts won't return read posts and notifications.list drops
+   *  badges once read, so we persist sightings to survive both. */
+  private postsCachePromise: Promise<PostsCache> | undefined;
 
   constructor(options: AulaContextOptions = {}) {
     this.store = options.store ?? defaultStore();
@@ -146,6 +151,19 @@ export class AulaContext {
     }
     this.cachedInstitutionProfileIds = ids;
     return ids;
+  }
+
+  /** Get the on-disk posts cache, lazily loaded once per server lifetime. */
+  async getPostsCache(): Promise<PostsCache> {
+    if (!this.postsCachePromise) {
+      this.postsCachePromise = (async () => {
+        const dir = process.env.AULA_MCP_DIR ?? join(homedir(), '.config', 'aula-mcp');
+        const cache = new PostsCache(join(dir, 'posts-cache.json'));
+        await cache.load();
+        return cache;
+      })();
+    }
+    return this.postsCachePromise;
   }
 
   async getWidgetManager(): Promise<WidgetTokenManager> {

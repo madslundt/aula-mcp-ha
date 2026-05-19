@@ -76,6 +76,9 @@ function fakeContext(): AulaContext {
       lastGetPostsArgs = args;
       return { posts: [{ id: 42, title: 'Orientering til forældre' }], hasMorePosts: false };
     },
+    async getNotifications() {
+      return [];
+    },
   };
   return {
     record: {
@@ -93,6 +96,18 @@ function fakeContext(): AulaContext {
     },
     async getInstitutionProfileIds(): Promise<readonly number[]> {
       return [7001];
+    },
+    // Stub the posts cache: in-memory only, never writes to disk so tests
+    // stay hermetic. The fallback path observes notifications and reads
+    // back from this cache when posts.getAllPosts returns empty.
+    async getPostsCache() {
+      const posts: Record<string, unknown> = {};
+      return {
+        observeNotifications: () => 0,
+        list: () => Object.values(posts),
+        save: async () => {},
+        size: 0,
+      };
     },
   } as unknown as AulaContext;
 }
