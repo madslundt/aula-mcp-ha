@@ -2,8 +2,14 @@
 
 Runs each morning Mon–Thu. Mirrors your original prompt structure — minimal, per-child digest — with the class news-feed (`aula.posts.list`) added so "Orientering til forældre"-style announcements get captured.
 
+**Important — anchor the date before sending the prompt.** Your scheduler (n8n / cron / Shortcut) MUST replace `{{TODAY}}` and `{{TOMORROW}}` with concrete dates before the LLM sees the prompt, otherwise the model will guess and leak today's content into tomorrow's digest. In n8n: `{{$now.format("yyyy-MM-dd, EEEE")}}` for today and `{{$now.plus({days:1}).format("yyyy-MM-dd, EEEE")}}` for tomorrow.
+
 ```text
 Analysér data fra Aula og giv et dagligt overblik formateret som HTML til Telegram.
+
+KONTEKST:
+- I DAG er {{TODAY}}.
+- I MORGEN er {{TOMORROW}}.
 
 DATA:
 - Find alle børn (kald `aula.discover` én gang — brug manifestens childIds,
@@ -25,10 +31,10 @@ REGLER:
 - TIDSZONE: Serveren returnerer allerede dansk tid (Europe/Copenhagen).
   Gør INGEN konvertering — vis tider som de er.
 - KUN I MORGEN: Alt indhold (kalender, ugeplan, "VIGTIGT") skal handle om
-  i MORGENs dato. Spring eksplicit alt over der hører til i dag eller
-  tidligere — kun events/lektier dateret til i morgen vises. Hvis et
-  ugeplan-element ikke har en dato, kun medtag det hvis det tydeligt
-  hører til i morgen.
+  {{TOMORROW}}. Spring eksplicit alt over der hører til {{TODAY}} eller
+  tidligere. Ugeplaner returneres ofte for hele ugen — find den dag der
+  matcher {{TOMORROW}} og brug KUN den dags indhold. Hvis et element ikke
+  kan dateres til {{TOMORROW}}, udelad det.
 - FORMAT: <b>navne</b>, <code>tider</code>, <blockquote>vigtigt</blockquote>.
   Escape <, > og & i alt indhold fra Aula.
 

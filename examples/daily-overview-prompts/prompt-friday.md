@@ -2,8 +2,15 @@
 
 Runs Friday morning. Pivots from "tomorrow is school" to "weekend + next Monday". Same shape as your original prompt, with `aula.posts.list` added.
 
+**Important — anchor the dates before sending.** Your scheduler MUST replace `{{TODAY}}`, `{{NEXT_MONDAY}}`, and `{{NEXT_WEEK_ISOWEEK}}` with concrete values, otherwise the model will guess.
+
 ```text
 Analysér data fra Aula og giv en ugeafslutning formateret som HTML til Telegram.
+
+KONTEKST:
+- I DAG er {{TODAY}}.
+- NÆSTE MANDAG er {{NEXT_MONDAY}}.
+- KOMMENDE ISO-UGE er {{NEXT_WEEK_ISOWEEK}} (fx "2026-W21").
 
 DATA:
 - Find alle børn (kald `aula.discover` én gang).

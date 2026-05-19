@@ -257,11 +257,11 @@ export class AulaClient {
     params.set('method', 'posts.getAllPosts');
     params.set('parent', opts.parent ?? 'profile');
     params.set('index', opts.index ?? farFuture);
-    params.set('direction', opts.direction ?? 'descending');
     for (const id of opts.institutionProfileIds) {
       params.append('institutionProfileIds[]', String(id));
     }
     if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+    if (opts.direction !== undefined) params.set('direction', opts.direction);
     const data = await this.getJsonRaw<unknown>(params);
     if (data === undefined) {
       throw new AulaApiError('posts.getAllPosts response missing data', 200, '', '');

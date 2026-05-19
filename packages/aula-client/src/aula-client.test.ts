@@ -132,7 +132,9 @@ describe('AulaClient API method wrappers', () => {
     expect(url).toContain('institutionProfileIds%5B%5D=4995301');
     expect(url).toContain('institutionProfileIds%5B%5D=5218369');
     expect(url).toContain('limit=20');
-    expect(url).toContain('direction=descending');
+    // direction is NOT sent by default — Aula 400s on unexpected params,
+    // and the web client omits it.
+    expect(url).not.toContain('direction=');
     // index is a far-future ISO timestamp by default — Aula treats it as
     // "give me posts older than this date", so a future date returns newest.
     const indexMatch = url.match(/[?&]index=([^&]+)/);

@@ -2,8 +2,14 @@
 
 Runs Sunday evening. "Tomorrow" is Monday — already in next ISO week. Same shape as your original prompt, with `aula.posts.list` added.
 
+**Important — anchor the dates before sending.** Your scheduler MUST replace `{{TODAY}}`, `{{TOMORROW}}` (Monday), and `{{NEXT_WEEK_ISOWEEK}}` with concrete values.
+
 ```text
 Analysér data fra Aula og giv et ugeoverblik formateret som HTML til Telegram.
+
+KONTEKST:
+- I DAG er {{TODAY}} (søndag).
+- I MORGEN er {{TOMORROW}} (mandag, første dag i ISO-uge {{NEXT_WEEK_ISOWEEK}}).
 
 DATA:
 - Find alle børn (kald `aula.discover` én gang).
