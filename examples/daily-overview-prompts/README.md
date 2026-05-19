@@ -2,11 +2,13 @@
 
 Three scheduled prompts that turn `aula-mcp` data into a daily Telegram digest in Danish.
 
-| Schedule       | Prompt                                              | Purpose                                                |
-|----------------|-----------------------------------------------------|--------------------------------------------------------|
-| Mon–Thu, AM    | [`prompt-weekday.md`](./prompt-weekday.md)          | Tomorrow's school day + heads-up for day after         |
-| Friday, AM     | [`prompt-friday.md`](./prompt-friday.md)            | Week wrap-up + what to prep over the weekend           |
-| Sunday, evening| [`prompt-sunday.md`](./prompt-sunday.md)            | Full next-week overview, Monday-focused                |
+| Schedule       | Prompt (reference)                                  | HA / Node-RED function node                              | Purpose                                                |
+|----------------|-----------------------------------------------------|----------------------------------------------------------|--------------------------------------------------------|
+| Mon–Thu, AM    | [`prompt-weekday.md`](./prompt-weekday.md)          | [`prompt-weekday.js`](./prompt-weekday.js)              | Tomorrow's school day + heads-up for day after         |
+| Friday, AM     | [`prompt-friday.md`](./prompt-friday.md)            | [`prompt-friday.js`](./prompt-friday.js)                | Week wrap-up + what to prep over the weekend           |
+| Sunday, evening| [`prompt-sunday.md`](./prompt-sunday.md)            | [`prompt-sunday.js`](./prompt-sunday.js)                | Full next-week overview, Monday-focused                |
+
+The `.md` files document the prompt; the `.js` files are drop-in function-node bodies for Home Assistant's "Run JavaScript function" / Node-RED's `function` node. The JS files compute today's date, tomorrow's date, and the relevant ISO week in `Europe/Copenhagen` and inline them into the prompt so the LLM doesn't have to guess what "tomorrow" is.
 
 ## Why three prompts?
 
