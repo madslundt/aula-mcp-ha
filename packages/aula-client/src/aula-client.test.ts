@@ -132,22 +132,11 @@ describe('AulaClient API method wrappers', () => {
     expect(url).toContain('institutionProfileIds%5B%5D=4995301');
     expect(url).toContain('institutionProfileIds%5B%5D=5218369');
     expect(url).toContain('limit=20');
-    // direction is NOT sent by default — Aula 400s on unexpected params,
-    // and the web client omits it.
+    // direction and index are opt-in. Aula v23's posts.getAllPosts 400s on
+    // any string `index` (only accepts a numeric postId cursor) so we omit
+    // both by default and let callers pass them when paginating.
     expect(url).not.toContain('direction=');
-    // index is a far-future Aula-format timestamp by default. Aula treats
-    // index as "give me posts older than this date", and its API rejects
-    // standard ISO — it expects "YYYY-MM-DD HH:MM:SS.0000+ZZZZ" with a
-    // Copenhagen offset (the same shape `aulaTs` produces for calendar).
-    // URLSearchParams round-trips correctly (decoding "+" back to space).
-    const indexParam = new URL(url).searchParams.get('index');
-    expect(indexParam).not.toBeNull();
-    expect(indexParam ?? '').toMatch(
-      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.0000[+-]\d{4}$/,
-    );
-    // Date portion is in the future — Aula returns newest posts when index is "later".
-    const [datePart] = (indexParam ?? '').split(' ');
-    expect(datePart && new Date(`${datePart}T00:00:00Z`).getTime()).toBeGreaterThan(Date.now());
+    expect(url).not.toContain('index=');
   });
 
   test('getPosts honors explicit index + direction overrides', async () => {
@@ -159,11 +148,11 @@ describe('AulaClient API method wrappers', () => {
     const c = makeClient(http);
     await c.getPosts({
       institutionProfileIds: [1],
-      index: '2025-01-01 00:00:00.0000+0100',
+      index: '2025-01-01T00:00:00.0000+0100',
       direction: 'ascending',
     });
     const url = http.requested[1]?.url ?? '';
-    expect(url).toContain('index=2025-01-01+00%3A00%3A00.0000%2B0100');
+    expect(url).toContain('index=2025-01-01T00%3A00%3A00.0000%2B0100');
     expect(url).toContain('direction=ascending');
   });
 

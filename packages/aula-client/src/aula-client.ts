@@ -50,14 +50,15 @@ export interface AulaClientOptions {
 const DEFAULT_API_BASE_HOST = 'https://www.aula.dk';
 
 /**
- * Format a Date as Aula's custom timestamp:
- * `YYYY-MM-DD HH:MM:SS.0000+ZZZZ` in Europe/Copenhagen wall-clock time.
+ * Format a Date as Aula's posts-style timestamp:
+ * `YYYY-MM-DDTHH:MM:SS.0000+ZZZZ` in Europe/Copenhagen wall-clock time.
  *
- * Aula's `posts.getAllPosts` and `calendar.getEventsByProfileIdsAndResourceIds`
- * both reject standard ISO-8601 (`T` separator / `.000Z`) — this format is
- * what the Aula web client sends.
+ * `posts.getAllPosts` 400s on standard ISO (`.000Z`). The Aula web client
+ * (and the reverse-engineered scaarup/aula Python client) use a `T`
+ * separator + `.0000` + Copenhagen offset for the `index` cursor. Calendar
+ * uses a space separator instead; the two endpoints disagree on this.
  */
-function formatAulaTimestamp(d: Date): string {
+function formatAulaTimestamp(d: Date, separator: 'T' | ' ' = 'T'): string {
   const fmt = new Intl.DateTimeFormat('da-DK', {
     timeZone: 'Europe/Copenhagen',
     year: 'numeric',
@@ -78,7 +79,7 @@ function formatAulaTimestamp(d: Date): string {
   if (offsetH < -12) offsetH += 24;
   const sign = offsetH >= 0 ? '+' : '-';
   const hh = String(Math.abs(offsetH)).padStart(2, '0');
-  return `${get('year')}-${get('month')}-${get('day')} ${hourPart}:${get('minute')}:${get('second')}.0000${sign}${hh}00`;
+  return `${get('year')}-${get('month')}-${get('day')}${separator}${hourPart}:${get('minute')}:${get('second')}.0000${sign}${hh}00`;
 }
 
 export class AulaClient {
@@ -282,16 +283,15 @@ export class AulaClient {
     if (opts.institutionProfileIds.length === 0) {
       throw new Error('getPosts: institutionProfileIds must be non-empty');
     }
-    const farFuture = formatAulaTimestamp(
-      new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000),
-    );
     const params = new URLSearchParams();
     params.set('method', 'posts.getAllPosts');
     params.set('parent', opts.parent ?? 'profile');
-    params.set('index', opts.index ?? farFuture);
+    // posts.getAllPosts in v23 uses bracketed array params (the `[]` form).
+    // It rejects unknown shapes with HTTP 400 / status.code=40.
     for (const id of opts.institutionProfileIds) {
       params.append('institutionProfileIds[]', String(id));
     }
+    if (opts.index !== undefined) params.set('index', opts.index);
     if (opts.limit !== undefined) params.set('limit', String(opts.limit));
     if (opts.direction !== undefined) params.set('direction', opts.direction);
     const data = await this.getJsonRaw<unknown>(params);
