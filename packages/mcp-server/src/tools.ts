@@ -135,16 +135,40 @@ export function registerTools(server: McpServer, context: AulaContext): void {
     'aula.posts.list',
     {
       title: 'Aula posts (class news feed)',
-      description: 'Teacher posts and class-level updates.',
+      description:
+        'Teacher posts and class-level updates (the "Opslag" feed in the Aula app). ' +
+        'Scoped to the guardian\'s institutionProfileIds — defaults to ALL of them ' +
+        '(from aula.discover → institutionProfileIds, i.e. ' +
+        'profiles[0].institutionProfiles[*].id). Pass an explicit subset to narrow.',
       inputSchema: {
+        institutionProfileIds: z
+          .array(z.number().int().positive())
+          .min(1)
+          .optional()
+          .describe(
+            'Guardian institutionProfile IDs (from aula.discover.institutionProfileIds). ' +
+              'Defaults to all of the guardian\'s schools when omitted.',
+          ),
         limit: z.number().int().min(1).max(50).optional(),
         index: z.number().int().min(0).optional(),
       },
     },
     async (args) => {
       const client = await context.getClient();
+      const institutionProfileIds = args.institutionProfileIds?.length
+        ? args.institutionProfileIds
+        : await context.getInstitutionProfileIds();
+      if (institutionProfileIds.length === 0) {
+        return jsonContent({
+          error: 'no_institution_profiles',
+          message:
+            'Could not resolve any guardian institutionProfile IDs. The Aula API needs ' +
+            'institutionProfileIds[] to return posts — without them the feed is empty.',
+        });
+      }
       return jsonContent(
         await client.getPosts({
+          institutionProfileIds,
           ...(args.limit !== undefined ? { limit: args.limit } : {}),
           ...(args.index !== undefined ? { index: args.index } : {}),
         }),

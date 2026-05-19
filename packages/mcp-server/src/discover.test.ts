@@ -39,7 +39,16 @@ function fakeContext(opts: FakeOptions = {}): AulaContext {
   const fakeClient = {
     currentApiVersion: 22,
     async getProfilesByLogin() {
-      return { profiles: [{ id: 1, name: 'Casper', children }] };
+      // Guardian's institutionProfile.id values per school — distinct from
+      // each child's institutionProfile.id. Used by posts.list scoping.
+      const institutionProfiles = Array.from({ length: childCount }, (_, i) => ({
+        id: 7000 + i,
+        institutionCode: 'D12345',
+        institutionName: 'Demo Skole',
+      }));
+      return {
+        profiles: [{ id: 1, name: 'Casper', children, institutionProfiles }],
+      };
     },
     async getProfileContext() {
       return {
@@ -152,5 +161,13 @@ describe('buildDiscoverManifest', () => {
   test('omits identityName when not set in record', async () => {
     const m = await buildDiscoverManifest(fakeContext({ identityName: null }));
     expect(m.user.identityName).toBeUndefined();
+  });
+
+  test('exposes guardian institutionProfileIds (per school) — distinct from children[].institution.id', async () => {
+    const m = await buildDiscoverManifest(fakeContext({ childCount: 2 }));
+    expect(m.institutionProfileIds).toEqual([7000, 7001]);
+    // Different from each child's institutionProfile.id (9000, 9001):
+    expect(m.children[0]?.institution?.id).toBe(9000);
+    expect(m.children[1]?.institution?.id).toBe(9001);
   });
 });

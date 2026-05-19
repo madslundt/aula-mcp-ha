@@ -52,6 +52,11 @@ export class AulaContext {
    *  or an opaque alphanumeric token; we treat it as opaque to match
    *  upstream Python's `str(child["userId"])` handling. */
   private cachedGuardianUserId: string | undefined;
+  /** Guardian's institutionProfile.id per school, from
+   *  profiles.getProfilesByLogin → profiles[0].institutionProfiles[*].id.
+   *  Required as the `institutionProfileIds[]` scope on posts.getAllPosts;
+   *  distinct from children[].institutionProfile.id. */
+  private cachedInstitutionProfileIds: readonly number[] | undefined;
 
   constructor(options: AulaContextOptions = {}) {
     this.store = options.store ?? defaultStore();
@@ -93,6 +98,7 @@ export class AulaContext {
     this.widgetManagerPromise = undefined;
     this.cachedRecord = undefined;
     this.cachedGuardianUserId = undefined;
+    this.cachedInstitutionProfileIds = undefined;
   }
 
   /**
@@ -113,6 +119,33 @@ export class AulaContext {
     }
     this.cachedGuardianUserId = String(ctx.userId);
     return this.cachedGuardianUserId;
+  }
+
+  /**
+   * Guardian institutionProfile IDs (one per school), from
+   * `profiles.getProfilesByLogin → profiles[0].institutionProfiles[*].id`.
+   * Required as the `institutionProfileIds[]` scope on `posts.getAllPosts`.
+   *
+   * Distinct from `children[].institutionProfile.id` — those are the children's
+   * profiles at their institutions; this is the guardian's profile at each
+   * institution they're registered at. Cached after first call.
+   */
+  async getInstitutionProfileIds(): Promise<readonly number[]> {
+    if (this.cachedInstitutionProfileIds !== undefined) return this.cachedInstitutionProfileIds;
+    const client = await this.getClient();
+    const data = await client.getProfilesByLogin();
+    const seen = new Set<number>();
+    const ids: number[] = [];
+    for (const profile of data.profiles ?? []) {
+      for (const ip of profile.institutionProfiles ?? []) {
+        if (typeof ip.id === 'number' && !seen.has(ip.id)) {
+          seen.add(ip.id);
+          ids.push(ip.id);
+        }
+      }
+    }
+    this.cachedInstitutionProfileIds = ids;
+    return ids;
   }
 
   async getWidgetManager(): Promise<WidgetTokenManager> {

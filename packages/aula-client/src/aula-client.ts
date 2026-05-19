@@ -221,13 +221,38 @@ export class AulaClient {
 
   /**
    * `posts.getAllPosts` — class-level news feed (teacher posts, etc.).
+   *
+   * Aula's API requires `institutionProfileIds[]` to scope the request to the
+   * guardian's profile at each school; without them the endpoint returns the
+   * guardian's empty private feed. The IDs are the GUARDIAN's
+   * `institutionProfile.id` per school — found at
+   * `profilesByLogin.profiles[0].institutionProfiles[*].id`, distinct from
+   * `children[].institutionProfile.id`.
+   *
    * Returns the raw `data` field. Pagination via `limit` + `index` (both 0-based).
    */
-  async getPosts(opts: { limit?: number; index?: number } = {}): Promise<unknown> {
-    const params: Record<string, string> = {};
-    if (opts.limit !== undefined) params.limit = String(opts.limit);
-    if (opts.index !== undefined) params.index = String(opts.index);
-    return this.getJson<unknown>('posts.getAllPosts', params);
+  async getPosts(opts: {
+    institutionProfileIds: readonly number[];
+    limit?: number;
+    index?: number;
+    parent?: string;
+  }): Promise<unknown> {
+    if (opts.institutionProfileIds.length === 0) {
+      throw new Error('getPosts: institutionProfileIds must be non-empty');
+    }
+    const params = new URLSearchParams();
+    params.set('method', 'posts.getAllPosts');
+    params.set('parent', opts.parent ?? 'profile');
+    for (const id of opts.institutionProfileIds) {
+      params.append('institutionProfileIds[]', String(id));
+    }
+    if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+    if (opts.index !== undefined) params.set('index', String(opts.index));
+    const data = await this.getJsonRaw<unknown>(params);
+    if (data === undefined) {
+      throw new AulaApiError('posts.getAllPosts response missing data', 200, '', '');
+    }
+    return data;
   }
 
   /**

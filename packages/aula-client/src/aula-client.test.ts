@@ -117,6 +117,30 @@ describe('AulaClient API method wrappers', () => {
     expect(http.requested.length).toBe(0);
   });
 
+  test('getPosts serializes institutionProfileIds[] + parent + limit on the URL', async () => {
+    const http = new FakeHttp();
+    http.enqueue(
+      { status: 200, body: envelope({ posts: [] }) }, // probe
+      { status: 200, body: envelope({ posts: [{ id: 1 }], hasMorePosts: false }) }, // call
+    );
+    const c = makeClient(http);
+    const out = await c.getPosts({ institutionProfileIds: [4995301, 5218369], limit: 20 });
+    expect(out).toEqual({ posts: [{ id: 1 }], hasMorePosts: false });
+    const url = http.requested[1]?.url ?? '';
+    expect(url).toContain('method=posts.getAllPosts');
+    expect(url).toContain('parent=profile');
+    expect(url).toContain('institutionProfileIds%5B%5D=4995301');
+    expect(url).toContain('institutionProfileIds%5B%5D=5218369');
+    expect(url).toContain('limit=20');
+  });
+
+  test('getPosts throws when institutionProfileIds is empty', async () => {
+    const http = new FakeHttp();
+    const c = makeClient(http);
+    await expect(c.getPosts({ institutionProfileIds: [] })).rejects.toThrow(/non-empty/);
+    expect(http.requested.length).toBe(0);
+  });
+
   test('postJson includes csrfp-token header from cookie jar', async () => {
     const http = new FakeHttp();
     http.setCookie('Csrfp-Token', 'CSRF-XYZ');

@@ -47,6 +47,10 @@ export interface DiscoverManifest {
     identityName?: string;
   };
   children: DiscoveredChild[];
+  /** Guardian's institutionProfile.id per school (the parent's profile at
+   *  each institution they're registered at). Required by `aula.posts.list`
+   *  as `institutionProfileIds[]`. Distinct from `children[].institution.id`. */
+  institutionProfileIds: number[];
   apiVersion: number;
   tokens: {
     /** Unix epoch seconds. */
@@ -111,6 +115,7 @@ export async function buildDiscoverManifest(context: AulaContext): Promise<Disco
   ]);
 
   const children: DiscoveredChild[] = [];
+  const institutionProfileIdSet = new Set<number>();
   for (const profile of profilesData.profiles ?? []) {
     for (const child of profile.children ?? []) {
       const inst = child.institutionProfile;
@@ -124,7 +129,11 @@ export async function buildDiscoverManifest(context: AulaContext): Promise<Disco
       }
       children.push(item);
     }
+    for (const ip of profile.institutionProfiles ?? []) {
+      if (typeof ip.id === 'number') institutionProfileIdSet.add(ip.id);
+    }
   }
+  const institutionProfileIds = Array.from(institutionProfileIdSet);
 
   // Capability detection from widget configs.
   // Aula nests the widget id under `widget.widgetId` in the live API; older
@@ -145,6 +154,7 @@ export async function buildDiscoverManifest(context: AulaContext): Promise<Disco
       ...(record.identityName ? { identityName: record.identityName } : {}),
     },
     children,
+    institutionProfileIds,
     apiVersion: client.currentApiVersion,
     tokens: {
       expires_at: record.tokens.expires_at,
@@ -159,9 +169,10 @@ export async function buildDiscoverManifest(context: AulaContext): Promise<Disco
       nameResolution:
         'Match kid names from the user prompt against children[].name (case-insensitive, partial). E.g. "luk" matches "Lukas". ' +
         'Use children[].id for childIds (presence.today, ugeplan, opgaver, ugebrev, huskelisten, lektier). ' +
-        'Use children[].institution.id for profileIds (calendar.events — institution profile IDs, NOT child.id). ' +
+        'Use children[].institution.id for profileIds on calendar.events — the CHILD\'s institution-profile id, NOT child.id. ' +
         'Use children[].institution.code for institutionCodes (ugeplan, opgaver, ugebrev, huskelisten, lektier). ' +
-        'Use children[].userId only as sessionId/sessionUUID when a third-party integration explicitly asks for it.',
+        'Use children[].userId only as sessionId/sessionUUID when a third-party integration explicitly asks for it. ' +
+        'For aula.posts.list, pass institutionProfileIds (top-level field on this manifest — the GUARDIAN\'s profile ids per school, distinct from children[].institution.id). It defaults to all of them when omitted, so usually you can leave it off.',
       pickOne:
         'For ugeplan/ugebrev/opgaver/huskelisten, call only capabilities[area].tools[0] — that is the provider this user actually has. Skip alternates unless the first errors.',
       timeWindows:

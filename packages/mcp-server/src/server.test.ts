@@ -30,6 +30,9 @@ const TOKENS: AulaTokens = {
   obtained_at: Math.floor(Date.now() / 1000),
 };
 
+/** Spy that captures the last getPosts call args, exposed for assertions. */
+let lastGetPostsArgs: unknown;
+
 function fakeContext(): AulaContext {
   const fakeClient = {
     currentApiVersion: 22,
@@ -51,6 +54,9 @@ function fakeContext(): AulaContext {
                 },
               },
             ],
+            institutionProfiles: [
+              { id: 7001, institutionCode: 'D12345', institutionName: 'Demo Skole' },
+            ],
           },
         ],
       };
@@ -66,6 +72,10 @@ function fakeContext(): AulaContext {
         },
       };
     },
+    async getPosts(args: unknown) {
+      lastGetPostsArgs = args;
+      return { posts: [{ id: 42, title: 'Orientering til forældre' }], hasMorePosts: false };
+    },
   };
   return {
     record: {
@@ -80,6 +90,9 @@ function fakeContext(): AulaContext {
     },
     async getGuardianUserId(): Promise<string> {
       return '5000';
+    },
+    async getInstitutionProfileIds(): Promise<readonly number[]> {
+      return [7001];
     },
   } as unknown as AulaContext;
 }
@@ -246,6 +259,42 @@ describe('MCP server: tools/call(aula.discover)', () => {
     expect(manifest.detectedWidgets).toEqual(['0001', '0030']);
     // EasyIQ (0001) should be listed first for ugeplan since it's detected.
     expect(manifest.capabilities.ugeplan?.tools[0]).toBe('aula.ugeplan.easyiq');
+  });
+});
+
+describe('MCP server: tools/call(aula.posts.list)', () => {
+  test('defaults institutionProfileIds to the guardian scope when omitted', async () => {
+    await init();
+    lastGetPostsArgs = undefined;
+    const r = await rpc({
+      jsonrpc: '2.0',
+      id: 100,
+      method: 'tools/call',
+      params: { name: 'aula.posts.list', arguments: { limit: 10 } },
+    });
+    expect(r.error).toBeUndefined();
+    const args = lastGetPostsArgs as { institutionProfileIds: number[]; limit?: number };
+    expect(args.institutionProfileIds).toEqual([7001]);
+    expect(args.limit).toBe(10);
+    const result = r.result as { content: Array<{ text: string }> };
+    const text = result.content[0]?.text ?? '';
+    expect(text).toContain('Orientering til forældre');
+  });
+
+  test('passes through explicit institutionProfileIds when provided', async () => {
+    await init();
+    lastGetPostsArgs = undefined;
+    await rpc({
+      jsonrpc: '2.0',
+      id: 101,
+      method: 'tools/call',
+      params: {
+        name: 'aula.posts.list',
+        arguments: { institutionProfileIds: [4995301, 5218369] },
+      },
+    });
+    const args = lastGetPostsArgs as { institutionProfileIds: number[] };
+    expect(args.institutionProfileIds).toEqual([4995301, 5218369]);
   });
 });
 

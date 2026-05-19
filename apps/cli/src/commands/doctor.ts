@@ -106,8 +106,22 @@ export async function runDoctor(args: DoctorCommandArgs = {}): Promise<void> {
   });
 
   await runCheck(checks, 'posts.getAllPosts', async () => {
-    const data = await client.getPosts({ limit: 5 });
-    return `received (${typeof data}; ${JSON.stringify(data).length} chars)`;
+    // posts.getAllPosts needs the guardian's institutionProfile IDs (per
+    // school) — without them Aula returns an empty feed.
+    const profilesData = await client.getProfilesByLogin();
+    const institutionProfileIds = Array.from(
+      new Set(
+        (profilesData.profiles ?? [])
+          .flatMap((p) => p.institutionProfiles ?? [])
+          .map((ip) => ip.id)
+          .filter((id): id is number => typeof id === 'number'),
+      ),
+    );
+    if (institutionProfileIds.length === 0) {
+      return 'skipped — no guardian institutionProfile ids found';
+    }
+    const data = await client.getPosts({ institutionProfileIds, limit: 5 });
+    return `received (${typeof data}; ${JSON.stringify(data).length} chars; scope=${institutionProfileIds.length})`;
   });
 
   await runCheck(checks, 'aulaToken.getAulaToken', async () => {
