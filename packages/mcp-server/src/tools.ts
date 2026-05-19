@@ -150,7 +150,14 @@ export function registerTools(server: McpServer, context: AulaContext): void {
               'Defaults to all of the guardian\'s schools when omitted.',
           ),
         limit: z.number().int().min(1).max(50).optional(),
-        index: z.number().int().min(0).optional(),
+        index: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            'ISO timestamp cursor — return posts strictly older than this date. ' +
+              'Omit for the most recent posts (server defaults to a far-future date).',
+          ),
       },
     },
     async (args) => {

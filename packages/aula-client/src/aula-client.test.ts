@@ -132,6 +132,31 @@ describe('AulaClient API method wrappers', () => {
     expect(url).toContain('institutionProfileIds%5B%5D=4995301');
     expect(url).toContain('institutionProfileIds%5B%5D=5218369');
     expect(url).toContain('limit=20');
+    expect(url).toContain('direction=descending');
+    // index is a far-future ISO timestamp by default — Aula treats it as
+    // "give me posts older than this date", so a future date returns newest.
+    const indexMatch = url.match(/[?&]index=([^&]+)/);
+    expect(indexMatch).not.toBeNull();
+    const decodedIndex = decodeURIComponent(indexMatch?.[1] ?? '');
+    expect(decodedIndex).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/);
+    expect(new Date(decodedIndex).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test('getPosts honors explicit index + direction overrides', async () => {
+    const http = new FakeHttp();
+    http.enqueue(
+      { status: 200, body: envelope({ posts: [] }) }, // probe
+      { status: 200, body: envelope({ posts: [], hasMorePosts: false }) }, // call
+    );
+    const c = makeClient(http);
+    await c.getPosts({
+      institutionProfileIds: [1],
+      index: '2025-01-01T00:00:00.000Z',
+      direction: 'ascending',
+    });
+    const url = http.requested[1]?.url ?? '';
+    expect(url).toContain('index=2025-01-01T00%3A00%3A00.000Z');
+    expect(url).toContain('direction=ascending');
   });
 
   test('getPosts throws when institutionProfileIds is empty', async () => {

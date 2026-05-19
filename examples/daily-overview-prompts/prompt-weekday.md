@@ -24,6 +24,11 @@ DATA:
 REGLER:
 - TIDSZONE: Serveren returnerer allerede dansk tid (Europe/Copenhagen).
   Gør INGEN konvertering — vis tider som de er.
+- KUN I MORGEN: Alt indhold (kalender, ugeplan, "VIGTIGT") skal handle om
+  i MORGENs dato. Spring eksplicit alt over der hører til i dag eller
+  tidligere — kun events/lektier dateret til i morgen vises. Hvis et
+  ugeplan-element ikke har en dato, kun medtag det hvis det tydeligt
+  hører til i morgen.
 - FORMAT: <b>navne</b>, <code>tider</code>, <blockquote>vigtigt</blockquote>.
   Escape <, > og & i alt indhold fra Aula.
 
