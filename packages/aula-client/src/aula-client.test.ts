@@ -135,13 +135,19 @@ describe('AulaClient API method wrappers', () => {
     // direction is NOT sent by default — Aula 400s on unexpected params,
     // and the web client omits it.
     expect(url).not.toContain('direction=');
-    // index is a far-future ISO timestamp by default — Aula treats it as
-    // "give me posts older than this date", so a future date returns newest.
-    const indexMatch = url.match(/[?&]index=([^&]+)/);
-    expect(indexMatch).not.toBeNull();
-    const decodedIndex = decodeURIComponent(indexMatch?.[1] ?? '');
-    expect(decodedIndex).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.000Z$/);
-    expect(new Date(decodedIndex).getTime()).toBeGreaterThan(Date.now());
+    // index is a far-future Aula-format timestamp by default. Aula treats
+    // index as "give me posts older than this date", and its API rejects
+    // standard ISO — it expects "YYYY-MM-DD HH:MM:SS.0000+ZZZZ" with a
+    // Copenhagen offset (the same shape `aulaTs` produces for calendar).
+    // URLSearchParams round-trips correctly (decoding "+" back to space).
+    const indexParam = new URL(url).searchParams.get('index');
+    expect(indexParam).not.toBeNull();
+    expect(indexParam ?? '').toMatch(
+      /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.0000[+-]\d{4}$/,
+    );
+    // Date portion is in the future — Aula returns newest posts when index is "later".
+    const [datePart] = (indexParam ?? '').split(' ');
+    expect(datePart && new Date(`${datePart}T00:00:00Z`).getTime()).toBeGreaterThan(Date.now());
   });
 
   test('getPosts honors explicit index + direction overrides', async () => {
@@ -153,11 +159,11 @@ describe('AulaClient API method wrappers', () => {
     const c = makeClient(http);
     await c.getPosts({
       institutionProfileIds: [1],
-      index: '2025-01-01T00:00:00.000Z',
+      index: '2025-01-01 00:00:00.0000+0100',
       direction: 'ascending',
     });
     const url = http.requested[1]?.url ?? '';
-    expect(url).toContain('index=2025-01-01T00%3A00%3A00.000Z');
+    expect(url).toContain('index=2025-01-01+00%3A00%3A00.0000%2B0100');
     expect(url).toContain('direction=ascending');
   });
 

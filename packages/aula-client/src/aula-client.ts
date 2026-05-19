@@ -49,6 +49,38 @@ export interface AulaClientOptions {
 
 const DEFAULT_API_BASE_HOST = 'https://www.aula.dk';
 
+/**
+ * Format a Date as Aula's custom timestamp:
+ * `YYYY-MM-DD HH:MM:SS.0000+ZZZZ` in Europe/Copenhagen wall-clock time.
+ *
+ * Aula's `posts.getAllPosts` and `calendar.getEventsByProfileIdsAndResourceIds`
+ * both reject standard ISO-8601 (`T` separator / `.000Z`) — this format is
+ * what the Aula web client sends.
+ */
+function formatAulaTimestamp(d: Date): string {
+  const fmt = new Intl.DateTimeFormat('da-DK', {
+    timeZone: 'Europe/Copenhagen',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '00';
+  const hourPart = get('hour') === '24' ? '00' : get('hour');
+  const cphHour = Number(hourPart);
+  const utcHour = d.getUTCHours();
+  let offsetH = cphHour - utcHour;
+  if (offsetH > 12) offsetH -= 24;
+  if (offsetH < -12) offsetH += 24;
+  const sign = offsetH >= 0 ? '+' : '-';
+  const hh = String(Math.abs(offsetH)).padStart(2, '0');
+  return `${get('year')}-${get('month')}-${get('day')} ${hourPart}:${get('minute')}:${get('second')}.0000${sign}${hh}00`;
+}
+
 export class AulaClient {
   readonly http: AulaHttpClient;
   private readonly logger: Logger;
@@ -250,9 +282,9 @@ export class AulaClient {
     if (opts.institutionProfileIds.length === 0) {
       throw new Error('getPosts: institutionProfileIds must be non-empty');
     }
-    const farFuture = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .replace(/\.\d+Z$/, '.000Z');
+    const farFuture = formatAulaTimestamp(
+      new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000),
+    );
     const params = new URLSearchParams();
     params.set('method', 'posts.getAllPosts');
     params.set('parent', opts.parent ?? 'profile');
