@@ -16,10 +16,14 @@ export interface IntegrationContext {
   guardianId: string;
   /** Children to query (numeric Aula child profile IDs). */
   childIds: number[];
-  /** Per-child opaque user-id tokens (mix of letters and digits, e.g.
-   *  `"abcd1234"`), aligned with `childIds` by index. SkolePortal's
-   *  `x-childfilter` header takes this, NOT the numeric `childIds`.
-   *  Optional — most integrations don't need it. */
+  /** Per-child unilogin / opaque user-id tokens (mix of letters and digits,
+   *  e.g. `"nora4047"`), aligned with `childIds` by index. Required by:
+   *    - Meebook (`childFilter[]` query param — regex `[0-9a-zA-Z]`)
+   *    - SkolePortal (`x-childfilter` header)
+   *  Numeric `childIds` are rejected by both backends. Optional at the
+   *  TypeScript level so integrations that key on numeric ids (EasyIQ 0001,
+   *  Min Uddannelse, Systematic) don't have to fill it; each consumer
+   *  validates presence at call time. */
   childUserIds?: string[];
   /** Institution codes (e.g. "G12345"). */
   institutionCodes: string[];

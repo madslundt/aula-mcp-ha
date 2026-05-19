@@ -185,6 +185,36 @@ describe('MeebookClient.getWeekPlan', () => {
     expect(http.requested[0]?.headers?.sessionuuid).toBe('cj');
     expect(http.requested[0]?.headers?.['x-version']).toBe('1.0');
   });
+
+  test('childFilter[] uses unilogin from childUserIds, not numeric childIds', async () => {
+    // Meebook 400s with "Fandt et unilogin i child filter med et ugyldigt
+    // format" when childFilter[] gets the numeric profile id. Pin the wire
+    // format so we don't regress.
+    const http = new FakeHttp().enqueue({ status: 200, body: '[]' });
+    const client = new MeebookClient({ http: http.asHttpClient(), widgets: fakeWidgets() });
+    await client.getWeekPlan(
+      ctx({ childIds: [4995299, 5218304], childUserIds: ['nora4047', 'alvi0909'] }),
+    );
+    const url = http.requested[0]?.url ?? '';
+    expect(url).toContain('childFilter%5B%5D=nora4047');
+    expect(url).toContain('childFilter%5B%5D=alvi0909');
+    expect(url).not.toContain('childFilter%5B%5D=4995299');
+    expect(url).not.toContain('childFilter%5B%5D=5218304');
+  });
+
+  test('rejects up-front when childUserIds is missing or empty per child', async () => {
+    const http = new FakeHttp();
+    const client = new MeebookClient({ http: http.asHttpClient(), widgets: fakeWidgets() });
+    // Length mismatch (here: 2 childIds, 0 childUserIds) — same failure
+    // mode as childUserIds being undefined at the type level.
+    await expect(client.getWeekPlan(ctx({ childIds: [1, 2], childUserIds: [] }))).rejects.toThrow(
+      /Meebook needs the per-child unilogin/,
+    );
+    await expect(
+      client.getWeekPlan(ctx({ childIds: [1, 2], childUserIds: ['u1', ''] })),
+    ).rejects.toThrow(/none was provided for childIds: 2/);
+    expect(http.requested).toHaveLength(0);
+  });
 });
 
 // --------------------------------------------------------------------------

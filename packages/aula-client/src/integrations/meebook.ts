@@ -4,6 +4,11 @@
  * GET https://app.meebook.com/aulaapi/relatedweekplan/all
  *   Headers: authorization Bearer, sessionuuid: <mitid username>, x-version: 1.0,
  *            origin / referer aula.dk
+ *   Query:   childFilter[]=<unilogin>  ← per-child unilogin string (e.g.
+ *            "nora4047"), NOT the numeric Aula child profile id. Meebook
+ *            regex-validates against `[0-9a-zA-Z]` and 400s otherwise with
+ *            "Fandt et unilogin i child filter med et ugyldigt format".
+ *            Source: `ctx.childUserIds`, aligned by index with `ctx.childIds`.
  *   Returns: array of person objects, each with weekPlan: [{ date, tasks }],
  *            tasks have { type: comment|task|assignment, title|content, ... }
  */
@@ -61,11 +66,29 @@ export class MeebookClient {
   }
 
   async getWeekPlan(ctx: IntegrationContext): Promise<NormalisedWeekPlan> {
+    // Meebook's childFilter[] is the per-child unilogin string (alphanumeric,
+    // e.g. "nora4047"), not the numeric Aula child profile id. The server
+    // regex-validates against `[0-9a-zA-Z]` and returns HTTP 400 with
+    // "Fandt et unilogin i child filter med et ugyldigt format" otherwise.
+    if (!ctx.childUserIds || ctx.childUserIds.length !== ctx.childIds.length) {
+      throw new Error(
+        'Meebook needs the per-child unilogin (childUserIds) aligned with childIds; ' +
+          'populate from getProfilesByLogin().profiles[].children[].userId',
+      );
+    }
+    const missing = ctx.childIds
+      .map((id, i) => (ctx.childUserIds?.[i] ? null : id))
+      .filter((v): v is number => v !== null);
+    if (missing.length > 0) {
+      throw new Error(
+        `Meebook needs the per-child unilogin (childUserIds); none was provided for childIds: ${missing.join(', ')}`,
+      );
+    }
     const result = await this.widgets.withRetry(this.widgetId, async (token) => {
       const params = new URLSearchParams();
       params.set('currentWeekNumber', ctx.isoWeek);
       params.set('userProfile', 'guardian');
-      for (const cid of ctx.childIds) params.append('childFilter[]', String(cid));
+      for (const unilogin of ctx.childUserIds ?? []) params.append('childFilter[]', unilogin);
       for (const code of ctx.institutionCodes) params.append('institutionFilter[]', code);
       const url = `${MEEBOOK_BASE}?${params.toString()}`;
       const res = await this.http.request(url, {
