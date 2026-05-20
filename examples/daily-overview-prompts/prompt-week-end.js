@@ -33,7 +33,7 @@ const isoWeek = (d) => {
   const dayNum = dt.getUTCDay() || 7;
   dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((dt - yearStart) / 86400000 + 1) / 7);
+  const weekNo = Math.ceil(((dt.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return `${dt.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 };
 
@@ -54,7 +54,7 @@ DATA:
   næste uge, weekend-arrangementer, eller noget der skal være klar mandag).
 - Opslag (klassens nyhedsfeed): KALD ALTID 'aula.posts.list' (limit=20).
   Aulas "Opslag"-feed — IKKE det samme som beskeder. Medtag alle opslag
-  fra sidste 7 dage uden relevans-filter.
+  fra sidste 7 dage uden relevans-filter. Filtrér output til næste uge (${NEXT_ISOWEEK}).
 - Ugeplan: 'aula.ugeplan.<provider>' for hvert barn med isoWeek="${NEXT_ISOWEEK}".
   Brug ugeplanen til at fremhæve vigtigste fokus/lektier for kommende uge —
   særligt ${NEXT_MONDAY}.
@@ -62,8 +62,6 @@ DATA:
   Filtrér client-side til kun ${NEXT_MONDAY} (og evt. weekend-events).
 
 REGLER:
-- TIDSZONE: Serveren returnerer allerede dansk tid (Europe/Copenhagen).
-  Gør INGEN konvertering.
 - KUN MANDAG + WEEKEND: Spring eksplicit alt over der hører til ${TODAY}
   eller tidligere.
 - FORMAT: <b>navne</b>, <code>tider</code>, <blockquote>vigtigt</blockquote>.

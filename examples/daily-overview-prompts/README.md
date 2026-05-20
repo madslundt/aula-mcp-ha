@@ -2,13 +2,13 @@
 
 Three scheduled prompts that turn `aula-mcp` data into a daily Telegram digest in Danish.
 
-| Schedule       | Prompt (reference)                                  | HA / Node-RED function node                              | Purpose                                                |
-|----------------|-----------------------------------------------------|----------------------------------------------------------|--------------------------------------------------------|
-| Mon–Thu, AM    | [`prompt-weekday.md`](./prompt-weekday.md)          | [`prompt-weekday.js`](./prompt-weekday.js)              | Tomorrow's school day + heads-up for day after         |
-| Friday, AM     | [`prompt-friday.md`](./prompt-friday.md)            | [`prompt-friday.js`](./prompt-friday.js)                | Week wrap-up + what to prep over the weekend           |
-| Sunday, evening| [`prompt-sunday.md`](./prompt-sunday.md)            | [`prompt-sunday.js`](./prompt-sunday.js)                | Full next-week overview, Monday-focused                |
+| Schedule        | HA / Node-RED function node                                      | Purpose                                          |
+|-----------------|------------------------------------------------------------------|--------------------------------------------------|
+| Mon–Thu, AM     | [`prompt-weekday.js`](./prompt-weekday.js)                       | Tomorrow's school day + heads-up for day after   |
+| Friday, AM      | [`prompt-week-end.js`](./prompt-week-end.js)                     | Week wrap-up + what to prep over the weekend     |
+| Sunday, evening | [`prompt-week-start.js`](./prompt-week-start.js)                 | Full next-week overview, Monday-focused          |
 
-The `.md` files document the prompt; the `.js` files are drop-in function-node bodies for Home Assistant's "Run JavaScript function" / Node-RED's `function` node. The JS files compute today's date, tomorrow's date, and the relevant ISO week in `Europe/Copenhagen` and inline them into the prompt so the LLM doesn't have to guess what "tomorrow" is.
+Each `.js` file is a drop-in function-node body for Home Assistant's "Run JavaScript function" / Node-RED's `function` node. The script computes today's date, the relevant target date (tomorrow / next Monday), and the relevant ISO week in `Europe/Copenhagen`, then inlines them into the prompt so the LLM doesn't have to guess what "tomorrow" is.
 
 ## Why three prompts?
 
@@ -34,7 +34,7 @@ Using one generic prompt across all three would either miss the weekend bridge (
 - **`profileIds` vs `childIds`:** calendar tools want `children[].institution.id`; ugeplan/opgaver/ugebrev/huskelisten want `children[].id` + `children[].institution.code`. Mixing them is the most common bug.
 - **Messages have no server-side date filter.** `aula.messages.list_threads` only paginates; the agent must filter "last 7 days" + "requires action" client-side. "Action" is defined in each prompt to keep output stable across days.
 - **Posts ≠ messages.** Class-wide announcements like "Orientering til forældre" come from `aula.posts.list` (teacher news feed), not from `messages.list_threads`. Both channels must be queried — querying only one drops half the digest.
-- **`aula.posts.list` scoping** is handled by the server: it auto-passes the guardian's `institutionProfileIds[]` (from `profiles[0].institutionProfiles[*].id`) so the prompt doesn't need to. If you ever pass an explicit subset, find the IDs in `aula.discover.institutionProfileIds`.
+- **`aula.posts.list` scoping** is handled by the server: it fans out across every group the guardian belongs to (`parent=group&groupId=<N>`) and merges results — the only mode that returns already-read posts. Each post is enriched with `_institutionCode` so prompts can attribute posts to the right child via `children[].institution.code`.
 - **Step-up auth:** `aula.messages.get_thread` can return `step_up_required` for sensitive threads. The agent should fall back to the subject/preview and label it as MitID-locked rather than fail the whole digest.
 - **HTML safety:** Aula content can contain `<`, `>`, `&`. Escape them before injecting into Telegram HTML tags or `sendMessage` will reject the message.
 - **Stable per-child ordering** (alphabetical by first name) so morning skim diffs day-to-day.
