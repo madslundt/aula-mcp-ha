@@ -87,7 +87,7 @@ STRUKTUR:
 <b>🚨 HUSK OVER WEEKENDEN</b>
 <blockquote>[Ting der skal være klar til ${NEXT_MONDAY} — eller "Intet at huske 🟢".]</blockquote>
 
-<b>📢 OPSLAG (sidste 7 dage)</b>
+<b>📢 OPSLAG</b>
 • <code>[dato]</code> <b>[titel]</b> — [1-linje sammenfatning]
 [Gentag per opslag. Udelad hele sektionen hvis tom.]
 

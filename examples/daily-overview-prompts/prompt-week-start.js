@@ -84,7 +84,7 @@ STRUKTUR:
 <b>🚨 VIGTIGT & HANDLING</b>
 <blockquote>[Kritiske ting for hele ugen. Hvis intet: <i>Ingen akutte ændringer 🟢</i>.]</blockquote>
 
-<b>📢 OPSLAG (sidste 7 dage)</b>
+<b>📢 OPSLAG</b>
 • <code>[dato]</code> <b>[titel]</b> — [1-linje sammenfatning]
 [Gentag per opslag. Udelad hele sektionen hvis tom.]
 

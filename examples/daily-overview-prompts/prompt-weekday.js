@@ -105,7 +105,7 @@ STRUKTUR:
 • <code>[Tid]</code>: [Kalender-event i morgen]
 • [Besked-highlight]
 • [Ugeplan-highlight for ${TOMORROW}]
-<i>📢 Opslag (sidste 7 dage):</i>
+<i>📢 Opslag:</i>
 • <code>[dato]</code> <b>[titel]</b> — [1-linje sammenfatning]
 [Gentag per opslag der hører til dette barn (matchet via _institutionCode).
  Nyeste først. Udelad hele "Opslag"-linjen hvis ingen.]`;
