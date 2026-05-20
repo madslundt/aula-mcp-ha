@@ -53,8 +53,23 @@ DATA:
 - Beskeder: 'aula.messages.list_threads' (sidste 7 dage; fokusér på info om
   næste uge, weekend-arrangementer, eller noget der skal være klar mandag).
 - Opslag (klassens nyhedsfeed): KALD ALTID 'aula.posts.list' (limit=20).
-  Aulas "Opslag"-feed — IKKE det samme som beskeder. Medtag alle opslag
-  fra sidste 7 dage uden relevans-filter. Filtrér output til næste uge (${NEXT_ISOWEEK}).
+  Aulas "Opslag"-feed — IKKE det samme som beskeder.
+
+  MEDTAG KUN opslag der enten:
+    • kræver handling fra forælder (tilmelding, RSVP, samtykke, deadline),
+    • beskriver en ændring der påvirker kommende uge eller weekend
+      (aflysning, ændret tid/sted, vikar, ekstra ting at medbringe),
+    • handler om et arrangement i weekenden eller fra og med ${NEXT_MONDAY}.
+
+  UDELAD ALTID:
+    • Madplaner, ugesedler, almindelige nyhedsbreve,
+    • Tilbageblik, "snap fra ugen", hilsner, generelle opdateringer,
+    • Opslag om arrangementer eller deadlines der allerede er passeret,
+    • Ren info uden noget for forælderen at handle på.
+
+  TJEK DATO I OPSLAGET: hvis indholdet refererer til en konkret dato/
+  begivenhed FØR ${TODAY}, udelad det — uanset hvor nyligt det blev
+  postet.
 - Ugeplan: 'aula.ugeplan.<provider>' for hvert barn med isoWeek="${NEXT_ISOWEEK}".
   Brug ugeplanen til at fremhæve vigtigste fokus/lektier for kommende uge —
   særligt ${NEXT_MONDAY}.
