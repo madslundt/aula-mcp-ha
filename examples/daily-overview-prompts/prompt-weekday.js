@@ -1,10 +1,5 @@
 /**
- * Home Assistant / Node-RED function node — Mon–Thu morning Aula digest.
- *
- * Computes today + tomorrow + ISO week of tomorrow in Europe/Copenhagen
- * and inlines them into the prompt so the LLM has an unambiguous date
- * anchor. Without that, the model guesses "tomorrow" from whatever date
- * is most prominent in the fetched data and today's ugeplan leaks in.
+ * Home Assistant function node — Mon–Thu morning Aula digest.
  */
 
 const COPENHAGEN = 'Europe/Copenhagen';
@@ -12,7 +7,6 @@ const COPENHAGEN = 'Europe/Copenhagen';
 const today = new Date();
 const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
-/** "tirsdag 19. maj 2026" — Danish weekday + day + month + year. */
 const fmtDanish = (d) =>
   new Intl.DateTimeFormat('da-DK', {
     timeZone: COPENHAGEN,
@@ -22,7 +16,6 @@ const fmtDanish = (d) =>
     year: 'numeric',
   }).format(d);
 
-/** ISO week of a Date in Copenhagen time, formatted "YYYY-Www". */
 const isoWeek = (d) => {
   const [y, m, day] = new Intl.DateTimeFormat('en-CA', {
     timeZone: COPENHAGEN,
@@ -37,7 +30,7 @@ const isoWeek = (d) => {
   const dayNum = dt.getUTCDay() || 7;
   dt.setUTCDate(dt.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((dt - yearStart) / 86400000 + 1) / 7);
+  const weekNo = Math.ceil(((dt.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return `${dt.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 };
 
@@ -76,11 +69,9 @@ DATA:
 REGLER:
 - TIDSZONE: Serveren returnerer allerede dansk tid (Europe/Copenhagen).
   Gør INGEN konvertering — vis tider som de er.
-- KUN I MORGEN: Alt indhold (kalender, ugeplan, "VIGTIGT") skal handle om
-  ${TOMORROW}. Spring eksplicit alt over der hører til ${TODAY} eller
-  tidligere. Ugeplaner returneres ofte for hele ugen — find kun den dag
-  der matcher ${TOMORROW} og brug KUN den dags indhold. Hvis et element
-  ikke kan dateres til ${TOMORROW}, udelad det.
+- KUN I MORGEN gælder for kalender, ugeplan og "VIGTIGT" — spring alt over
+  der hører til ${TODAY} eller tidligere. Opslag derimod vises uden
+  dato-filter ud over "sidste 7 dage".
 - FORMAT: <b>navne</b>, <code>tider</code>, <blockquote>vigtigt</blockquote>.
   Escape <, > og & i alt indhold fra Aula.
 
