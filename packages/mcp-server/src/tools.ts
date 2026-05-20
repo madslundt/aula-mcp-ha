@@ -198,7 +198,10 @@ export function registerTools(server: McpServer, context: AulaContext): void {
       // Mode 3 (default): fan out across all groups, merge, dedupe by id,
       // sort newest first. This is the only mode that returns already-read
       // posts — Aula's institutionProfile-scoped feed only ever shows unread.
-      const groupIds = await context.getGroupIds();
+      const [groupIds, groupMeta] = await Promise.all([
+        context.getGroupIds(),
+        context.getGroupMeta(),
+      ]);
       if (groupIds.length === 0) {
         return jsonContent({
           posts: [],
@@ -209,7 +212,14 @@ export function registerTools(server: McpServer, context: AulaContext): void {
         });
       }
       const seen = new Set<number>();
-      const merged: Array<Record<string, unknown> & { _groupId: number }> = [];
+      const merged: Array<
+        Record<string, unknown> & {
+          _groupId: number;
+          _institutionCode?: string;
+          _institutionName?: string;
+          _groupName?: string;
+        }
+      > = [];
       const errors: Array<{ groupId: number; error: string }> = [];
       // perGroupLimit kept modest — most groups have <20 posts in the window.
       const perGroupLimit = Math.max(limit, 20);
@@ -219,12 +229,19 @@ export function registerTools(server: McpServer, context: AulaContext): void {
             const raw = (await client.getPosts({ groupId: gid, limit: perGroupLimit })) as {
               posts?: Array<Record<string, unknown>>;
             };
+            const meta = groupMeta.get(gid);
             for (const post of raw.posts ?? []) {
               const idVal = post.id ?? (post as { postId?: unknown }).postId;
               const id = typeof idVal === 'number' ? idVal : Number(idVal);
               if (!Number.isFinite(id) || seen.has(id)) continue;
               seen.add(id);
-              merged.push({ ...post, _groupId: gid });
+              merged.push({
+                ...post,
+                _groupId: gid,
+                ...(meta?.institutionCode ? { _institutionCode: meta.institutionCode } : {}),
+                ...(meta?.institutionName ? { _institutionName: meta.institutionName } : {}),
+                ...(meta?.name ? { _groupName: meta.name } : {}),
+              });
             }
           } catch (e) {
             errors.push({ groupId: gid, error: (e as Error).message });

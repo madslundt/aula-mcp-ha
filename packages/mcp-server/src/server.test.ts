@@ -100,6 +100,11 @@ function fakeContext(): AulaContext {
     async getGroupIds(): Promise<readonly number[]> {
       return [42];
     },
+    async getGroupMeta() {
+      return new Map([
+        [42, { institutionCode: 'D12345', institutionName: 'Demo Skole', name: 'Stjernerne' }],
+      ]);
+    },
   } as unknown as AulaContext;
 }
 

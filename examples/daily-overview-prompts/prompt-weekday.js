@@ -63,6 +63,11 @@ DATA:
   som beskeder. Medtag alle opslag fra sidste 7 dage — også "info-opslag"
   som "Orientering til forældre", "Madplan", arrangementer osv. Foretag IKKE
   en relevans-vurdering på opslag.
+  ATTRIBUER opslag til det rigtige barn: hver post har '_institutionCode'
+  (skolens kode). Match den mod children[].institution.code fra discover —
+  vis opslaget under det barn der hører til samme institution. Hvis et
+  opslag ikke matcher nogen institution (fx kommunale opslag), vis det
+  under alle børn.
 - Ugeplan: 'aula.ugeplan.<provider>' for hvert barn (provider fra discover's
   capabilities.ugeplan.tools[0]). Brug isoWeek="${ISOWEEK}" og filtrér output
   til kun ${TOMORROW} (spring weekend og andre dage over).
@@ -84,16 +89,15 @@ STRUKTUR:
 <b>🚨 VIGTIGT & HANDLING</b>
 <blockquote>[Aflysninger eller "husk-ting" til i morgen — eller "Ingenting i dag 🟢".]</blockquote>
 
-<b>📢 OPSLAG (sidste 7 dage)</b>
-• <code>[dato]</code> <b>[titel]</b> — [1-linje sammenfatning]
-[Gentag per opslag fra aula.posts.list. Nyeste først. Udelad hele sektionen
- hvis listen er tom.]
-
 -----------------------------------------
 [GENTAG PER BARN]:
 <b>👤 [BARNETS NAVN]</b>
 • <code>[Tid]</code>: [Kalender-event i morgen]
 • [Besked-highlight]
-• [Ugeplan-highlight for ${TOMORROW}]`;
+• [Ugeplan-highlight for ${TOMORROW}]
+<i>📢 Opslag (sidste 7 dage):</i>
+• <code>[dato]</code> <b>[titel]</b> — [1-linje sammenfatning]
+[Gentag per opslag der hører til dette barn (matchet via _institutionCode).
+ Nyeste først. Udelad hele "Opslag"-linjen hvis ingen.]`;
 
 return { ...msg, text };

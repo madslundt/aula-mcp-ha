@@ -61,6 +61,10 @@ export class AulaContext {
    *  groups. posts.getAllPosts only returns the full feed (read + unread)
    *  when scoped with `parent=group&groupId=<N>`. Cached after first lookup. */
   private cachedGroupIds: readonly number[] | undefined;
+  /** Map of groupId → metadata (institutionCode, institutionName, group
+   *  name). Lets `aula.posts.list` attribute each post to a school so the
+   *  LLM can place posts under the right child. */
+  private cachedGroupMeta: ReadonlyMap<number, { institutionCode?: string; institutionName?: string; name?: string }> | undefined;
 
   constructor(options: AulaContextOptions = {}) {
     this.store = options.store ?? defaultStore();
@@ -104,6 +108,7 @@ export class AulaContext {
     this.cachedGuardianUserId = undefined;
     this.cachedInstitutionProfileIds = undefined;
     this.cachedGroupIds = undefined;
+    this.cachedGroupMeta = undefined;
   }
 
   /**
@@ -160,19 +165,51 @@ export class AulaContext {
    * which is the only way to fetch already-read posts.
    */
   async getGroupIds(): Promise<readonly number[]> {
-    if (this.cachedGroupIds !== undefined) return this.cachedGroupIds;
+    await this.ensureGroupCaches();
+    return this.cachedGroupIds ?? [];
+  }
+
+  /** Lookup metadata for a group id (institutionCode, institutionName, group name). */
+  async getGroupMeta(): Promise<
+    ReadonlyMap<number, { institutionCode?: string; institutionName?: string; name?: string }>
+  > {
+    await this.ensureGroupCaches();
+    return this.cachedGroupMeta ?? new Map();
+  }
+
+  /** Populate both `cachedGroupIds` and `cachedGroupMeta` from a single
+   *  `getProfileContext` call. */
+  private async ensureGroupCaches(): Promise<void> {
+    if (this.cachedGroupIds !== undefined && this.cachedGroupMeta !== undefined) return;
     const client = await this.getClient();
     const ctx = (await client.getProfileContext('guardian')) as unknown as {
-      institutions?: Array<{ groups?: Array<{ id?: number }> }>;
-      municipalGroups?: Array<{ id?: number }>;
+      institutions?: Array<{
+        institutionCode?: string;
+        institutionName?: string;
+        groups?: Array<{ id?: number; name?: string }>;
+      }>;
+      municipalGroups?: Array<{
+        id?: number;
+        name?: string;
+        membershipInstitutions?: string[];
+      }>;
     };
     const seen = new Set<number>();
     const ids: number[] = [];
+    const meta = new Map<
+      number,
+      { institutionCode?: string; institutionName?: string; name?: string }
+    >();
     for (const inst of ctx.institutions ?? []) {
       for (const g of inst.groups ?? []) {
         if (typeof g.id === 'number' && !seen.has(g.id)) {
           seen.add(g.id);
           ids.push(g.id);
+          const entry: { institutionCode?: string; institutionName?: string; name?: string } = {};
+          if (inst.institutionCode) entry.institutionCode = inst.institutionCode;
+          if (inst.institutionName) entry.institutionName = inst.institutionName;
+          if (g.name) entry.name = g.name;
+          meta.set(g.id, entry);
         }
       }
     }
@@ -180,10 +217,17 @@ export class AulaContext {
       if (typeof g.id === 'number' && !seen.has(g.id)) {
         seen.add(g.id);
         ids.push(g.id);
+        const entry: { institutionCode?: string; institutionName?: string; name?: string } = {};
+        // Municipal groups cover multiple institutions — take the first as a
+        // best-effort attribution. If a guardian has overlap, both kids see
+        // the same municipal post anyway.
+        if (g.membershipInstitutions?.[0]) entry.institutionCode = g.membershipInstitutions[0];
+        if (g.name) entry.name = g.name;
+        meta.set(g.id, entry);
       }
     }
     this.cachedGroupIds = ids;
-    return ids;
+    this.cachedGroupMeta = meta;
   }
 
   async getWidgetManager(): Promise<WidgetTokenManager> {
