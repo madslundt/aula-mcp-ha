@@ -136,18 +136,28 @@ export function registerTools(server: McpServer, context: AulaContext): void {
     {
       title: 'Aula posts (class news feed)',
       description:
-        'Teacher posts and class-level updates (the "Opslag" feed in the Aula app). ' +
-        'Scoped to the guardian\'s institutionProfileIds — defaults to ALL of them ' +
-        '(from aula.discover → institutionProfileIds, i.e. ' +
-        'profiles[0].institutionProfiles[*].id). Pass an explicit subset to narrow.',
+        'Teacher posts and class-level updates — the "Opslag" feed in the Aula app, ' +
+        'including read posts. By default fans out across every group the guardian ' +
+        'has access to (parent=group&groupId=<N>) and merges results, sorted newest ' +
+        'first. Pass `groupId` to narrow to one group, or `institutionProfileIds` to ' +
+        'use the legacy unread-only feed.',
       inputSchema: {
+        groupId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe(
+            'Restrict to a single group (from profileContext.institutions[].groups[].id). ' +
+              'Omit to fan out across all groups.',
+          ),
         institutionProfileIds: z
           .array(z.number().int().positive())
           .min(1)
           .optional()
           .describe(
-            'Guardian institutionProfile IDs (from aula.discover.institutionProfileIds). ' +
-              'Defaults to all of the guardian\'s schools when omitted.',
+            'Legacy unread-only feed (advances profileLastSeenPostDate on every call). ' +
+              'Prefer the default group fan-out unless you specifically want unread state.',
           ),
         limit: z.number().int().min(1).max(50).optional(),
         index: z
@@ -155,63 +165,88 @@ export function registerTools(server: McpServer, context: AulaContext): void {
           .min(1)
           .optional()
           .describe(
-            'ISO timestamp cursor — return posts strictly older than this date. ' +
-              'Omit for the most recent posts (server defaults to a far-future date).',
+            'Numeric postId cursor (Aula 400s on date strings). Omit for the first page.',
           ),
       },
     },
     async (args) => {
       const client = await context.getClient();
-      const institutionProfileIds = args.institutionProfileIds?.length
-        ? args.institutionProfileIds
-        : await context.getInstitutionProfileIds();
-      if (institutionProfileIds.length === 0) {
+      const limit = args.limit ?? 20;
+
+      // Mode 1: explicit single group.
+      if (args.groupId !== undefined) {
+        return jsonContent(
+          await client.getPosts({
+            groupId: args.groupId,
+            limit,
+            ...(args.index !== undefined ? { index: args.index } : {}),
+          }),
+        );
+      }
+
+      // Mode 2: explicit institutionProfileIds (legacy unread feed).
+      if (args.institutionProfileIds?.length) {
+        return jsonContent(
+          await client.getPosts({
+            institutionProfileIds: args.institutionProfileIds,
+            limit,
+            ...(args.index !== undefined ? { index: args.index } : {}),
+          }),
+        );
+      }
+
+      // Mode 3 (default): fan out across all groups, merge, dedupe by id,
+      // sort newest first. This is the only mode that returns already-read
+      // posts — Aula's institutionProfile-scoped feed only ever shows unread.
+      const groupIds = await context.getGroupIds();
+      if (groupIds.length === 0) {
         return jsonContent({
-          error: 'no_institution_profiles',
-          message:
-            'Could not resolve any guardian institutionProfile IDs. The Aula API needs ' +
-            'institutionProfileIds[] to return posts — without them the feed is empty.',
+          posts: [],
+          _note:
+            "No groups discovered from profileContext.institutions[].groups + " +
+            "municipalGroups. Either the guardian has no group memberships, or " +
+            "getProfileContext('guardian') failed.",
         });
       }
-      const raw = await client.getPosts({
-        institutionProfileIds,
-        ...(args.limit !== undefined ? { limit: args.limit } : {}),
-        ...(args.index !== undefined ? { index: args.index } : {}),
-      });
-
-      // Aula's posts.getAllPosts in v23 returns posts:[] once the guardian
-      // has viewed posts in the app (profileLastSeenPostDate advances).
-      // notifications.list only contains *unread* badges. To keep the
-      // digest useful, we observe posts via notifications.list while they
-      // are still visible and persist them in a local cache that survives
-      // read-state changes.
-      const postsCache = await context.getPostsCache();
-      try {
-        const notifs = await client.getNotifications();
-        const touched = postsCache.observeNotifications(notifs);
-        if (touched > 0) await postsCache.save();
-      } catch {
-        // Notifications fetch failures must not block posts.list — the
-        // cache lookup below still works on whatever was previously saved.
-      }
-
-      const looksEmpty =
-        typeof raw === 'object' &&
-        raw !== null &&
-        Array.isArray((raw as { posts?: unknown }).posts) &&
-        ((raw as { posts: unknown[] }).posts).length === 0;
-      if (!looksEmpty) return jsonContent(raw);
-
-      const limit = args.limit ?? 20;
-      const cached = postsCache.list(14).slice(0, limit);
+      const seen = new Set<number>();
+      const merged: Array<Record<string, unknown> & { _groupId: number }> = [];
+      const errors: Array<{ groupId: number; error: string }> = [];
+      // perGroupLimit kept modest — most groups have <20 posts in the window.
+      const perGroupLimit = Math.max(limit, 20);
+      await Promise.all(
+        groupIds.map(async (gid) => {
+          try {
+            const raw = (await client.getPosts({ groupId: gid, limit: perGroupLimit })) as {
+              posts?: Array<Record<string, unknown>>;
+            };
+            for (const post of raw.posts ?? []) {
+              const idVal = post.id ?? (post as { postId?: unknown }).postId;
+              const id = typeof idVal === 'number' ? idVal : Number(idVal);
+              if (!Number.isFinite(id) || seen.has(id)) continue;
+              seen.add(id);
+              merged.push({ ...post, _groupId: gid });
+            }
+          } catch (e) {
+            errors.push({ groupId: gid, error: (e as Error).message });
+          }
+        }),
+      );
+      // Sort by best-available date field, newest first.
+      const dateOf = (p: Record<string, unknown>): number => {
+        const raw =
+          (p.publishAt as string | undefined) ??
+          (p.timestamp as string | undefined) ??
+          (p.createdAt as string | undefined) ??
+          (p.publishDate as string | undefined);
+        return raw ? Date.parse(raw) : 0;
+      };
+      merged.sort((a, b) => dateOf(b) - dateOf(a));
       return jsonContent({
-        posts: cached.map((p) => ({ ...p, _source: 'cache' })),
-        _fallback: 'posts-cache',
-        _cacheSize: postsCache.size,
-        _note:
-          "Aula's posts.getAllPosts returned posts:[] (read-state advanced past all posts). " +
-          'Serving from the persistent post-metadata cache (populated from notifications.list ' +
-          'while badges were active). Cache window: 14 days, retention: 30 days.',
+        posts: merged.slice(0, limit),
+        _source: 'groups',
+        _groupsQueried: groupIds.length,
+        _postsFound: merged.length,
+        ...(errors.length > 0 ? { _errors: errors } : {}),
       });
     },
   );

@@ -30,7 +30,6 @@ import {
   SystematicClient,
   WidgetTokenManager,
 } from '@aula-mcp/aula-client';
-import { PostsCache } from './posts-cache.ts';
 
 export interface AulaContextOptions {
   store?: TokenStore;
@@ -58,10 +57,10 @@ export class AulaContext {
    *  Required as the `institutionProfileIds[]` scope on posts.getAllPosts;
    *  distinct from children[].institutionProfile.id. */
   private cachedInstitutionProfileIds: readonly number[] | undefined;
-  /** Persistent cache of post metadata observed via notifications.list.
-   *  posts.getAllPosts won't return read posts and notifications.list drops
-   *  badges once read, so we persist sightings to survive both. */
-  private postsCachePromise: Promise<PostsCache> | undefined;
+  /** Group IDs the guardian has access to, across institutions + municipal
+   *  groups. posts.getAllPosts only returns the full feed (read + unread)
+   *  when scoped with `parent=group&groupId=<N>`. Cached after first lookup. */
+  private cachedGroupIds: readonly number[] | undefined;
 
   constructor(options: AulaContextOptions = {}) {
     this.store = options.store ?? defaultStore();
@@ -104,6 +103,7 @@ export class AulaContext {
     this.cachedRecord = undefined;
     this.cachedGuardianUserId = undefined;
     this.cachedInstitutionProfileIds = undefined;
+    this.cachedGroupIds = undefined;
   }
 
   /**
@@ -153,17 +153,37 @@ export class AulaContext {
     return ids;
   }
 
-  /** Get the on-disk posts cache, lazily loaded once per server lifetime. */
-  async getPostsCache(): Promise<PostsCache> {
-    if (!this.postsCachePromise) {
-      this.postsCachePromise = (async () => {
-        const dir = process.env.AULA_MCP_DIR ?? join(homedir(), '.config', 'aula-mcp');
-        const cache = new PostsCache(join(dir, 'posts-cache.json'));
-        await cache.load();
-        return cache;
-      })();
+  /**
+   * Group IDs the guardian has access to (across institutions + municipal
+   * groups), discovered from `profiles.getProfileContext`. Required for the
+   * full-history mode of `posts.getAllPosts` (`parent=group&groupId=<N>`),
+   * which is the only way to fetch already-read posts.
+   */
+  async getGroupIds(): Promise<readonly number[]> {
+    if (this.cachedGroupIds !== undefined) return this.cachedGroupIds;
+    const client = await this.getClient();
+    const ctx = (await client.getProfileContext('guardian')) as unknown as {
+      institutions?: Array<{ groups?: Array<{ id?: number }> }>;
+      municipalGroups?: Array<{ id?: number }>;
+    };
+    const seen = new Set<number>();
+    const ids: number[] = [];
+    for (const inst of ctx.institutions ?? []) {
+      for (const g of inst.groups ?? []) {
+        if (typeof g.id === 'number' && !seen.has(g.id)) {
+          seen.add(g.id);
+          ids.push(g.id);
+        }
+      }
     }
-    return this.postsCachePromise;
+    for (const g of ctx.municipalGroups ?? []) {
+      if (typeof g.id === 'number' && !seen.has(g.id)) {
+        seen.add(g.id);
+        ids.push(g.id);
+      }
+    }
+    this.cachedGroupIds = ids;
+    return ids;
   }
 
   async getWidgetManager(): Promise<WidgetTokenManager> {

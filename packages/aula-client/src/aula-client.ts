@@ -255,41 +255,63 @@ export class AulaClient {
   /**
    * `posts.getAllPosts` — class-level news feed (teacher posts, etc.).
    *
-   * Aula's API requires `institutionProfileIds[]` to scope the request to the
-   * guardian's profile at each school; without them the endpoint returns the
-   * guardian's empty private feed. The IDs are the GUARDIAN's
-   * `institutionProfile.id` per school — found at
-   * `profilesByLogin.profiles[0].institutionProfiles[*].id`, distinct from
-   * `children[].institutionProfile.id`.
+   * In v23 Aula's API has two distinct scoping modes:
    *
-   * `index` is NOT a 0-based offset — it's an ISO-8601 timestamp cursor
-   * meaning "give me posts strictly OLDER than this date". For the most
-   * recent posts pass a far-future date (the reverse-engineered Python
-   * `scaarup/aula` client uses `2030-01-01T00:00:00.000Z`). We default
-   * to a date ~5 years from now so a plain `getPosts({institutionProfileIds})`
-   * returns the newest posts.
+   * 1. `parent: 'profile'` + `institutionProfileIds[]` — returns only the
+   *    guardian's UNREAD posts since `profileLastSeenPostDate`. Each call
+   *    advances the cursor to "now", so subsequent calls return empty.
+   *    `institutionProfileIds` are the GUARDIAN's institutionProfile.id per
+   *    school (from `profilesByLogin.profiles[0].institutionProfiles[*].id`).
+   *
+   * 2. `parent: 'group'` + `groupId` (SINGLE) — returns the group's full
+   *    feed including already-read posts. The Aula iPhone app uses this
+   *    mode and iterates through every group the guardian has access to.
+   *    Group IDs come from `profileContext.institutions[].groups[].id` and
+   *    `profileContext.municipalGroups[].id`.
+   *
+   *    NOTE: the array form `groupIds[]` does NOT work — only the singular
+   *    `groupId` param. So a multi-group view requires one request per group.
+   *
+   * `index` may be a numeric postId cursor — Aula accepts numerics and
+   * rejects date strings (HTTP 400, status.code=40) in v23. Most callers
+   * should omit it for the first page.
    *
    * Returns the raw `data` field.
    */
-  async getPosts(opts: {
-    institutionProfileIds: readonly number[];
-    limit?: number;
-    /** ISO timestamp cursor — fetch posts older than this. Defaults to "far future"
-     *  (≈ now + 5 years) so the call returns the most-recent posts. */
-    index?: string;
-    parent?: string;
-    direction?: string;
-  }): Promise<unknown> {
-    if (opts.institutionProfileIds.length === 0) {
-      throw new Error('getPosts: institutionProfileIds must be non-empty');
-    }
+  async getPosts(
+    opts:
+      | {
+          institutionProfileIds: readonly number[];
+          groupId?: never;
+          parent?: 'profile' | string;
+          limit?: number;
+          index?: string;
+          direction?: string;
+        }
+      | {
+          groupId: number;
+          institutionProfileIds?: never;
+          parent?: 'group' | string;
+          limit?: number;
+          index?: string;
+          direction?: string;
+        },
+  ): Promise<unknown> {
     const params = new URLSearchParams();
     params.set('method', 'posts.getAllPosts');
-    params.set('parent', opts.parent ?? 'profile');
-    // posts.getAllPosts in v23 uses bracketed array params (the `[]` form).
-    // It rejects unknown shapes with HTTP 400 / status.code=40.
-    for (const id of opts.institutionProfileIds) {
-      params.append('institutionProfileIds[]', String(id));
+    if ('groupId' in opts && opts.groupId !== undefined) {
+      params.set('parent', opts.parent ?? 'group');
+      params.set('groupId', String(opts.groupId));
+    } else if ('institutionProfileIds' in opts && opts.institutionProfileIds !== undefined) {
+      if (opts.institutionProfileIds.length === 0) {
+        throw new Error('getPosts: institutionProfileIds must be non-empty');
+      }
+      params.set('parent', opts.parent ?? 'profile');
+      for (const id of opts.institutionProfileIds) {
+        params.append('institutionProfileIds[]', String(id));
+      }
+    } else {
+      throw new Error('getPosts: must pass either institutionProfileIds or groupId');
     }
     if (opts.index !== undefined) params.set('index', opts.index);
     if (opts.limit !== undefined) params.set('limit', String(opts.limit));

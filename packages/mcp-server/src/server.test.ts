@@ -97,17 +97,8 @@ function fakeContext(): AulaContext {
     async getInstitutionProfileIds(): Promise<readonly number[]> {
       return [7001];
     },
-    // Stub the posts cache: in-memory only, never writes to disk so tests
-    // stay hermetic. The fallback path observes notifications and reads
-    // back from this cache when posts.getAllPosts returns empty.
-    async getPostsCache() {
-      const posts: Record<string, unknown> = {};
-      return {
-        observeNotifications: () => 0,
-        list: () => Object.values(posts),
-        save: async () => {},
-        size: 0,
-      };
+    async getGroupIds(): Promise<readonly number[]> {
+      return [42];
     },
   } as unknown as AulaContext;
 }
@@ -278,7 +269,7 @@ describe('MCP server: tools/call(aula.discover)', () => {
 });
 
 describe('MCP server: tools/call(aula.posts.list)', () => {
-  test('defaults institutionProfileIds to the guardian scope when omitted', async () => {
+  test('default mode fans out across the guardian groups', async () => {
     await init();
     lastGetPostsArgs = undefined;
     const r = await rpc({
@@ -288,15 +279,16 @@ describe('MCP server: tools/call(aula.posts.list)', () => {
       params: { name: 'aula.posts.list', arguments: { limit: 10 } },
     });
     expect(r.error).toBeUndefined();
-    const args = lastGetPostsArgs as { institutionProfileIds: number[]; limit?: number };
-    expect(args.institutionProfileIds).toEqual([7001]);
-    expect(args.limit).toBe(10);
+    // Fake groupIds returns [42]; the tool should call getPosts with that id.
+    const args = lastGetPostsArgs as { groupId?: number };
+    expect(args?.groupId).toBe(42);
     const result = r.result as { content: Array<{ text: string }> };
     const text = result.content[0]?.text ?? '';
     expect(text).toContain('Orientering til forældre');
+    expect(text).toContain('"_source": "groups"');
   });
 
-  test('passes through explicit institutionProfileIds when provided', async () => {
+  test('passes through explicit institutionProfileIds (legacy unread feed)', async () => {
     await init();
     lastGetPostsArgs = undefined;
     await rpc({
@@ -308,8 +300,22 @@ describe('MCP server: tools/call(aula.posts.list)', () => {
         arguments: { institutionProfileIds: [4995301, 5218369] },
       },
     });
-    const args = lastGetPostsArgs as { institutionProfileIds: number[] };
-    expect(args.institutionProfileIds).toEqual([4995301, 5218369]);
+    const args = lastGetPostsArgs as { institutionProfileIds?: number[]; groupId?: number };
+    expect(args?.institutionProfileIds).toEqual([4995301, 5218369]);
+    expect(args?.groupId).toBeUndefined();
+  });
+
+  test('honors an explicit single-group request', async () => {
+    await init();
+    lastGetPostsArgs = undefined;
+    await rpc({
+      jsonrpc: '2.0',
+      id: 102,
+      method: 'tools/call',
+      params: { name: 'aula.posts.list', arguments: { groupId: 999 } },
+    });
+    const args = lastGetPostsArgs as { groupId?: number };
+    expect(args?.groupId).toBe(999);
   });
 });
 
