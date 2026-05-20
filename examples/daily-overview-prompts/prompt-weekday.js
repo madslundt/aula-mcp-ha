@@ -52,10 +52,29 @@ DATA:
   handling/ændring — aflysninger, tidsændringer, ekstra ting at medbringe,
   tilladelser eller eksplicit svar nødvendigt).
 - Opslag (klassens nyhedsfeed): KALD ALTID 'aula.posts.list' (limit=20).
-  Dette er Aulas "Opslag"-feed (lærer-/skole-/klasse-info), IKKE det samme
-  som beskeder. Medtag alle opslag fra sidste 7 dage — også "info-opslag"
-  som "Orientering til forældre", "Madplan", arrangementer osv. Foretag IKKE
-  en relevans-vurdering på opslag.
+  Aulas "Opslag"-feed med lærer-/skole-/klasse-info — IKKE det samme som
+  beskeder.
+
+  MEDTAG KUN opslag der enten:
+    • kræver handling fra forælder (tilmelding, RSVP, samtykke,
+      svar nødvendigt, deadline),
+    • beskriver en ændring der påvirker kommende dage (aflysning,
+      ændret tid/sted, vikar, ekstra ting at medbringe),
+    • handler om et arrangement eller en begivenhed der ligger
+      i morgen (${TOMORROW}) eller senere.
+
+  UDELAD ALTID:
+    • Madplaner, ugesedler, almindelige nyhedsbreve,
+    • Tilbageblik, "snap fra ugen", hilsner, generelle opdateringer,
+    • Opslag om arrangementer eller deadlines der allerede er
+      passeret (selv hvis opslaget blev postet for nyligt),
+    • Ren info uden noget for forælderen at handle på.
+
+  TJEK DATO I OPSLAGET: hvis indholdet refererer til en konkret dato/
+  begivenhed, og den dato er FØR ${TOMORROW}, udelad opslaget — uanset
+  hvor nyligt det blev postet. Det er informationen om kommende uger
+  der har værdi, ikke historik.
+
   ATTRIBUER opslag til det rigtige barn: hver post har '_institutionCode'
   (skolens kode). Match den mod children[].institution.code fra discover —
   vis opslaget under det barn der hører til samme institution. Hvis et
